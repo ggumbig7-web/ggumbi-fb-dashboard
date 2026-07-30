@@ -4,24 +4,22 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>GGUMBI F&amp;B 통합 대시보드 (실시간)</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <style>
   :root{
-    --ink:#2B1B12; --parchment:#F7F1E7; --card:#FFFFFF; --card-border:#E8DCC8;
-    --muted:#8A7C6C; --amber:#B8722E; --amber-light:#E7B98A;
-    --teal:#2F6F5E; --teal-light:#CFE3DC; --rust:#B23A2E; --rust-light:#F0D3CE;
-    --blue:#2A5C8A; --blue-bg:#EAF1F8;
+    --ink:#1a1a2e; --parchment:#fafafa; --card:#f3f3f5; --card-border:#e4e4ec;
+    --muted:#6b6b80; --amber:#D97706; --amber-light:#F0C285;
+    --teal:#2A7D7B; --teal-light:#A3D3D2; --rust:#B85450; --rust-light:#F5D8D6;
+    --blue:#3D5A99; --blue-bg:#EEF2FB;
   }
   *{box-sizing:border-box;}
-  body{margin:0;background:var(--parchment);color:var(--ink);font-family:'Inter',sans-serif;-webkit-font-smoothing:antialiased;}
+  body{margin:0;background:var(--parchment);color:var(--ink);font-family:-apple-system,'Apple SD Gothic Neo','Noto Sans KR',sans-serif;font-size:13.7px;-webkit-font-smoothing:antialiased;}
   .wrap{max-width:1240px;margin:0 auto;padding:40px 26px 80px;}
   header{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:22px;flex-wrap:wrap;gap:14px;}
   .brand{display:flex;align-items:center;gap:12px;}
-  .brand-mark{width:38px;height:38px;border-radius:50%;background:conic-gradient(from 220deg, var(--amber), var(--amber-light), var(--amber));display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-weight:700;color:#fff;font-size:14px;}
+  .brand-mark{width:38px;height:38px;border-radius:50%;background:conic-gradient(from 220deg, var(--amber), var(--amber-light), var(--amber));display:flex;align-items:center;justify-content:center;font-family:-apple-system,'Apple SD Gothic Neo','Noto Sans KR',sans-serif;font-weight:700;color:#fff;font-size:14px;}
   .brand-text .eyebrow{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:600;}
-  .brand-text h1{font-family:'Fraunces',serif;font-weight:600;font-size:21px;margin:2px 0 0;}
+  .brand-text h1{font-family:-apple-system,'Apple SD Gothic Neo','Noto Sans KR',sans-serif;font-weight:600;font-size:21px;margin:2px 0 0;}
   .live-chip{display:inline-flex;align-items:center;gap:6px;background:#EAF6F1;color:var(--teal);border:1px solid var(--teal-light);padding:6px 14px;border-radius:999px;font-size:12px;font-weight:600;}
   .live-chip .dot{width:6px;height:6px;border-radius:50%;background:var(--teal);animation:pulse 1.8s infinite;}
   @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.35;}}
@@ -36,47 +34,47 @@
   .week-tab.active{background:var(--amber);color:#fff;border-color:var(--amber);}
 
   .kpi-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:24px;}
-  .kpi-card{background:var(--card);border:1px solid var(--card-border);border-radius:16px;padding:18px;}
+  .kpi-card{background:var(--card);border-radius:10px;padding:18px;}
   .kpi-card .k{font-size:11.5px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em;}
-  .kpi-card .v{font-family:'Fraunces',serif;font-size:22px;font-weight:600;margin:8px 0 2px;}
+  .kpi-card .v{font-family:-apple-system,'Apple SD Gothic Neo','Noto Sans KR',sans-serif;font-size:22px;font-weight:600;margin:8px 0 2px;}
   .kpi-card .sub{font-size:11.5px;color:var(--muted);}
 
   .section-title{display:flex;align-items:baseline;gap:10px;margin:34px 0 14px;}
-  .section-title h2{font-family:'Fraunces',serif;font-weight:600;font-size:19px;margin:0;}
+  .section-title h2{font-family:-apple-system,'Apple SD Gothic Neo','Noto Sans KR',sans-serif;font-weight:600;font-size:19px;margin:0;}
   .section-title span{font-size:12.5px;color:var(--muted);}
 
   .grid-2{display:grid;grid-template-columns:1.3fr 1fr;gap:18px;align-items:start;}
-  .card{background:var(--card);border:1px solid var(--card-border);border-radius:16px;padding:22px;}
+  .card{background:var(--card);border-radius:10px;padding:22px;}
   .card h3{font-size:13.5px;margin:0 0 14px;font-weight:600;}
   .chart-box{height:270px;}
 
   table{width:100%;border-collapse:collapse;font-size:12.8px;}
   thead th{text-align:right;font-size:11px;text-transform:uppercase;color:var(--muted);padding:0 8px 8px;border-bottom:1px solid var(--card-border);font-weight:600;}
   thead th:first-child,thead th:nth-child(2){text-align:left;}
-  tbody td{padding:9px 8px;border-bottom:1px solid #F1EADC;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:12.3px;}
-  tbody td:first-child,tbody td:nth-child(2){text-align:left;font-family:'Inter',sans-serif;font-weight:600;}
+  tbody td{padding:9px 8px;border-bottom:1px solid #F1EADC;text-align:right;font-family:-apple-system,'Apple SD Gothic Neo','Noto Sans KR',sans-serif;font-size:12.3px;}
+  tbody td:first-child,tbody td:nth-child(2){text-align:left;font-family:-apple-system,'Apple SD Gothic Neo','Noto Sans KR',sans-serif;font-weight:600;}
   tbody tr.total-row td{font-weight:700;background:#FBF6EC;}
   .neg{color:var(--rust);} .pos{color:var(--teal);}
   .table-scroll{max-height:460px;overflow-y:auto;}
 
-  .pl-card{background:var(--blue-bg);border:1px solid #C9DCEC;border-radius:16px;padding:22px;margin-bottom:24px;}
+  .pl-card{background:var(--blue-bg);border-radius:10px;padding:22px;margin-bottom:24px;}
   .pl-grid{display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:14px;align-items:end;}
   .pl-input-box .lbl{font-size:11.5px;color:var(--blue);font-weight:700;margin-bottom:6px;}
-  .pl-input-box input{width:100%;border:1px solid #C9DCEC;border-radius:8px;padding:9px 10px;font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--blue);background:#fff;}
+  .pl-input-box input{width:100%;border:1px solid #C9DCEC;border-radius:8px;padding:9px 10px;font-family:-apple-system,'Apple SD Gothic Neo','Noto Sans KR',sans-serif;font-size:13px;color:var(--blue);background:#fff;}
   .pl-result .k{font-size:11.5px;color:var(--muted);font-weight:600;text-transform:uppercase;}
-  .pl-result .v{font-family:'Fraunces',serif;font-size:20px;font-weight:600;margin:6px 0 2px;}
+  .pl-result .v{font-family:-apple-system,'Apple SD Gothic Neo','Noto Sans KR',sans-serif;font-size:20px;font-weight:600;margin:6px 0 2px;}
   .pl-result .sub{font-size:11.5px;color:var(--muted);}
 
-  .target-box{background:var(--card);border:1px solid var(--card-border);border-radius:16px;padding:22px 26px;margin-bottom:24px;}
+  .target-box{background:var(--card);border-radius:10px;padding:22px 26px;margin-bottom:24px;}
   .target-box .tb-title{font-weight:700;font-size:14px;margin-bottom:14px;}
   .target-line{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:8px;margin-bottom:8px;flex-wrap:wrap;}
   .target-line.lvl-total{background:#FBF6EC;}
   .target-line .tl-label{font-weight:700;font-size:13px;min-width:120px;}
   .target-line.lvl-sub .tl-label{font-weight:600;color:var(--amber);min-width:100px;padding-left:14px;}
-  .target-line .tl-nums{font-family:'IBM Plex Mono',monospace;font-size:13px;}
+  .target-line .tl-nums{font-family:-apple-system,'Apple SD Gothic Neo','Noto Sans KR',sans-serif;font-size:13px;}
   .target-line .bar-track{flex:1;min-width:140px;height:7px;background:#EFE7D8;border-radius:5px;overflow:hidden;}
   .target-line .bar-fill{height:100%;border-radius:5px;}
-  .target-line .tl-rate{font-family:'IBM Plex Mono',monospace;font-weight:700;font-size:13px;padding:2px 9px;border-radius:999px;}
+  .target-line .tl-rate{font-family:-apple-system,'Apple SD Gothic Neo','Noto Sans KR',sans-serif;font-weight:700;font-size:13px;padding:2px 9px;border-radius:999px;}
   .rate-good{background:var(--teal-light);color:var(--teal);}
   .rate-bad{background:var(--rust-light);color:var(--rust);}
 
@@ -107,8 +105,20 @@
   <div id="loadingMsg" class="loading">데이터를 불러오는 중입니다...</div>
   <div id="mainContent" style="display:none;">
 
-  <div class="month-tabs" id="monthTabs"></div>
   <div class="target-box" id="targetBox"></div>
+
+  <div class="section-title"><h2>7월 주간 목표 대비 실적</h2><span>VAT별도, 202606(판매)ERP 시트 실시간 연동</span></div>
+  <div class="controls" style="justify-content:flex-end;margin-bottom:6px;">
+    <div class="chan-toggle" id="weekTargetToggle">
+      <button data-wk="1주차" class="active">1주</button>
+      <button data-wk="2주차">2주</button>
+      <button data-wk="3주차">3주</button>
+      <button data-wk="4주차">4주</button>
+      <button data-wk="5주차">5주</button>
+    </div>
+  </div>
+  <div class="target-box" id="weekTargetBox"></div>
+
   <div class="kpi-grid" id="kpiGrid"></div>
 
   <div class="pl-card">
@@ -214,7 +224,7 @@ const weeks = [
   {week:'4주차', start:'2026-07-20', end:'2026-07-26'},
   {week:'5주차', start:'2026-07-27', end:'2026-07-31'},
 ];
-const custColors = ['#B8722E','#2F6F5E','#D9A25B','#8A7C6C','#B23A2E','#5B4636','#6E8CAB','#A66C9A'];
+const custColors = ['#3D9A9A','#D97706','#6BBDBD','#B85450','#8B6914','#A3D3D2','#3D5A99','#8B6BA6'];
 
 let selectedMonth = '2026-07';
 let selectedWeek = null;
@@ -398,7 +408,7 @@ let monthChart;
 function renderMonthChart(){
   const labels = monthly.map(m=>m.month);
   const salesArr = monthly.map(m=>m.sales/1_000_000);
-  const colors = monthly.map(m=>m.is_actual?'#B8722E':'#8AA9C4');
+  const colors = monthly.map(m=>m.is_actual?'#3D9A9A':'#A3D3D2');
   const ctx = document.getElementById('monthChart');
   if(monthChart) monthChart.destroy();
   monthChart = new Chart(ctx, { type:'bar', data:{labels, datasets:[{label:'매출(백만원)', data:salesArr, backgroundColor:colors, borderRadius:5, maxBarThickness:44}]},
@@ -407,7 +417,7 @@ function renderMonthChart(){
 
 function targetLine(label, plan, actual, rate, lvl){
   const good = rate>=0.6; const pct = Math.min(rate,1)*100;
-  const barColor = rate>=0.8?'#2F6F5E':(rate>=0.4?'#B8722E':'#B23A2E');
+  const barColor = rate>=0.8?'#2A7D7B':(rate>=0.4?'#D97706':'#B85450');
   return `<div class="target-line ${lvl==='total'?'lvl-total':'lvl-sub'}">
     <div class="tl-label">${label}</div>
     <div class="tl-nums"><b>${fmtWon(plan)}</b> / ${fmtWon(actual)}</div>
@@ -417,15 +427,36 @@ function targetLine(label, plan, actual, rate, lvl){
 }
 function renderTargetBox(){
   const box = document.getElementById('targetBox');
-  if(selectedMonth !== '2026-07'){ box.innerHTML = `<div class="tb-title">${selectedMonth} 확정 실적</div><div style="font-size:12px;color:var(--muted)">이 월은 목표(Plan) 데이터가 없어 실적만 표시합니다.</div>`; return; }
-  let t, title;
-  if(selectedWeek){ t = targets.weeks.find(w=>w.week===selectedWeek); title = `7월 ${selectedWeek} 목표 대비 실적`; }
-  else { t = targets.monthly; title = '7월 월간 목표 대비 실적'; }
+  const t = targets.monthly;
+  const title = '7월 월간 목표 대비 실적';
   box.innerHTML = `<div class="tb-title">${title}<span style="font-weight:400;font-size:11.5px;color:var(--muted);margin-left:6px;">(VAT별도, 202606(판매)ERP 시트 실시간 연동)</span></div>
     ${targetLine('매출목표', t.total.plan, t.total.actual, t.total.rate, 'total')}
     ${targetLine('G7 온라인', t.online.plan, t.online.actual, t.online.rate, 'sub')}
     ${targetLine('G7 쿠팡', t.coupang.plan, t.coupang.actual, t.coupang.rate, 'sub')}`;
 }
+
+let selectedWeekTarget = '1주차';
+function renderWeekTargetBox(){
+  const box = document.getElementById('weekTargetBox');
+  const t = targets.weeks.find(w=>w.week===selectedWeekTarget);
+  const wdef = weeks.find(w=>w.week===selectedWeekTarget);
+  const title = `7월 ${selectedWeekTarget} F&amp;B 주간매출`;
+  const note = `(VAT별도, ${wdef.start.slice(5).replace('-','.')}~${wdef.end.slice(5).replace('-','.')} ERP 거래명세서 기준)`;
+  const est = selectedWeekTarget === '5주차';
+  box.innerHTML = `<div class="tb-title">${title}<span style="font-weight:400;font-size:11.5px;color:var(--muted);margin-left:6px;">${note}</span></div>
+    ${targetLine('매출목표', t.total.plan, t.total.actual, t.total.rate, 'total')}
+    ${targetLine('G7 온라인', t.online.plan, t.online.actual, t.online.rate, 'sub')}
+    ${targetLine('G7 쿠팡', t.coupang.plan, t.coupang.actual, t.coupang.rate, 'sub')}
+    ${est?'<div style="font-size:11px;color:#A3D3D2;margin-top:4px;">※ 5주차 실적은 거래명세서 7/27~28 데이터 기준 잠정치입니다 (7/29~31 미반영)</div>':''}`;
+}
+document.querySelectorAll('#weekTargetToggle button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('#weekTargetToggle button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    selectedWeekTarget = btn.dataset.wk;
+    renderWeekTargetBox();
+  });
+});
 
 function renderWeekTabs(){
   const wrap = document.getElementById('weekTabs');
@@ -460,8 +491,8 @@ function renderDaily(){
   const ctx = document.getElementById('dailyChart');
   if(dailyChart) dailyChart.destroy();
   dailyChart = new Chart(ctx, {type:'bar', data:{labels, datasets:[
-    {label:'매출(백만원)', data:salesArr, backgroundColor:'#B8722E', borderRadius:4, maxBarThickness:34},
-    {label:'매출이익(백만원)', data:marginArr, backgroundColor:'#2F6F5E', borderRadius:4, maxBarThickness:34}
+    {label:'매출(백만원)', data:salesArr, backgroundColor:'#3D9A9A', borderRadius:4, maxBarThickness:34},
+    {label:'매출이익(백만원)', data:marginArr, backgroundColor:'#D97706', borderRadius:4, maxBarThickness:34}
   ]}, options:{
     maintainAspectRatio:false,
     plugins:{legend:{position:'bottom', labels:{font:{size:13}}}},
@@ -515,8 +546,8 @@ document.querySelectorAll('#dailyChanToggle button').forEach(btn=>{
 });
 
 function renderAll(){
-  renderMonthTabs();
   renderTargetBox();
+  renderWeekTargetBox();
   renderKPI();
   renderProfitCalc();
   document.getElementById('julySection').style.display = selectedMonth==='2026-07' ? 'block' : 'none';
