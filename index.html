@@ -122,6 +122,7 @@
   </div>
   <div class="target-box" id="weekTargetBox"></div>
 
+  <div class="section-title"><h2>현재 기준</h2><span id="currentAsOfLabel"></span></div>
   <div class="kpi-grid" id="kpiGrid"></div>
 
   <div class="pl-card">
@@ -131,6 +132,19 @@
       <div class="pl-result"><div class="k">매출총이익</div><div class="v" id="plGross">-</div><div class="sub" id="plGrossRate">-</div></div>
       <div class="pl-result"><div class="k">공헌이익</div><div class="v" id="plCM">입력 필요</div><div class="sub" id="plCMRate">-</div></div>
       <div class="pl-result"><div class="k">영업이익</div><div class="v" id="plOP">입력 필요</div><div class="sub" id="plOPRate">-</div></div>
+    </div>
+  </div>
+
+  <div class="section-title"><h2>예상 마감</h2><span id="forecastAsOfLabel"></span></div>
+  <div class="kpi-grid" id="kpiGridForecast"></div>
+
+  <div class="pl-card">
+    <div class="pl-grid">
+      <div class="pl-input-box"><div class="lbl">변동비 (원)</div><input type="number" id="vcInputF" placeholder="예: 15000000"></div>
+      <div class="pl-input-box"><div class="lbl">고정비 (원)</div><input type="number" id="fcInputF" placeholder="예: 35000000"></div>
+      <div class="pl-result"><div class="k">매출총이익</div><div class="v" id="plGrossF">-</div><div class="sub" id="plGrossRateF">-</div></div>
+      <div class="pl-result"><div class="k">공헌이익</div><div class="v" id="plCMF">입력 필요</div><div class="sub" id="plCMRateF">-</div></div>
+      <div class="pl-result"><div class="k">영업이익</div><div class="v" id="plOPF">입력 필요</div><div class="sub" id="plOPRateF">-</div></div>
     </div>
   </div>
 
@@ -360,25 +374,46 @@ function getPeriodDays(){
 
 function renderKPI(){
   const grid = document.getElementById('kpiGrid');
-  let sales, cost, qty, label;
+  let sales, cost, label;
   if(selectedMonth === '2026-07'){
     const dlist = getPeriodDays();
     sales = dlist.reduce((a,d)=>a+d.sales,0);
     cost = dlist.reduce((a,d)=>a+d.cost,0);
-    qty = dlist.reduce((a,d)=>a+d.qty,0);
     label = selectedWeek || '7월 누계';
   } else {
     const m = getMonthRow(selectedMonth);
-    sales = m.sales; cost = m.cost; qty = null;
+    sales = m.sales; cost = m.cost;
     label = selectedMonth + ' 확정';
   }
   const margin = sales - cost;
+  document.getElementById('currentAsOfLabel').textContent = `${label} (2026-07-01~28 실적)`;
   grid.innerHTML = `
-    ${qty!=null ? `<div class="kpi-card"><div class="k">수량</div><div class="v">${fmtNum(qty)}</div><div class="sub">개</div></div>` : '<div class="kpi-card"><div class="k">기간</div><div class="v" style="font-size:15px;">'+label+'</div><div class="sub">월간 확정 데이터</div></div>'}
     <div class="kpi-card"><div class="k">매출</div><div class="v">${fmtM(sales)}백만</div><div class="sub">${fmtWon(sales)}</div></div>
     <div class="kpi-card"><div class="k">매출원가</div><div class="v">${fmtM(cost)}백만</div><div class="sub">${fmtWon(cost)}</div></div>
     <div class="kpi-card"><div class="k">매출총이익</div><div class="v">${fmtM(margin)}백만</div><div class="sub">${fmtWon(margin)}</div></div>
     <div class="kpi-card"><div class="k">이익률</div><div class="v">${fmtPct(margin/sales)}</div><div class="sub">${label}</div></div>
+  `;
+}
+
+const DAYS_IN_JULY = 31;
+function getForecastFigures(){
+  const dlist = julyPeriodDays(); // full month-to-date, regardless of week/toggle selection
+  const daysWithData = dlist.length;
+  const sales = dlist.reduce((a,d)=>a+d.sales,0);
+  const cost = dlist.reduce((a,d)=>a+d.cost,0);
+  const factor = daysWithData ? DAYS_IN_JULY/daysWithData : 1;
+  return { sales: sales*factor, cost: cost*factor, daysWithData };
+}
+function renderKPIForecast(){
+  const grid = document.getElementById('kpiGridForecast');
+  const { sales, cost, daysWithData } = getForecastFigures();
+  const margin = sales - cost;
+  document.getElementById('forecastAsOfLabel').textContent = `7/1~${DAYS_IN_JULY}일 예측 (실적 ${daysWithData}일치 × ${DAYS_IN_JULY}/${daysWithData} 일할 환산)`;
+  grid.innerHTML = `
+    <div class="kpi-card"><div class="k">매출</div><div class="v">${fmtM(sales)}백만</div><div class="sub">${fmtWon(sales)}</div></div>
+    <div class="kpi-card"><div class="k">매출원가</div><div class="v">${fmtM(cost)}백만</div><div class="sub">${fmtWon(cost)}</div></div>
+    <div class="kpi-card"><div class="k">매출총이익</div><div class="v">${fmtM(margin)}백만</div><div class="sub">${fmtWon(margin)}</div></div>
+    <div class="kpi-card"><div class="k">이익률</div><div class="v">${fmtPct(margin/sales)}</div><div class="sub">예상 마감</div></div>
   `;
 }
 
@@ -404,6 +439,24 @@ function renderProfitCalc(){
   const op = cm - manualFC;
   opEl.textContent = fmtM(op)+'백만'; opEl.style.color = op<0?'var(--rust)':'var(--ink)'; opRateEl.textContent='이익률 '+fmtPct(op/sales);
 }
+
+let manualVCF=null, manualFCF=null;
+function renderProfitCalcForecast(){
+  const { sales, cost } = getForecastFigures();
+  const gross = sales - cost;
+  document.getElementById('plGrossF').textContent = fmtM(gross)+'백만';
+  document.getElementById('plGrossRateF').textContent = '이익률 '+fmtPct(gross/sales);
+  const cmEl=document.getElementById('plCMF'), cmRateEl=document.getElementById('plCMRateF');
+  const opEl=document.getElementById('plOPF'), opRateEl=document.getElementById('plOPRateF');
+  if(manualVCF==null){ cmEl.textContent='변동비 입력'; cmEl.style.color='var(--blue)'; cmRateEl.textContent='왼쪽에 입력하세요'; opEl.textContent='입력 필요'; opEl.style.color='var(--blue)'; opRateEl.textContent='-'; return; }
+  const cm = gross - manualVCF;
+  cmEl.textContent = fmtM(cm)+'백만'; cmEl.style.color='var(--ink)'; cmRateEl.textContent='이익률 '+fmtPct(cm/sales);
+  if(manualFCF==null){ opEl.textContent='고정비 입력'; opEl.style.color='var(--blue)'; opRateEl.textContent='왼쪽에 입력하세요'; return; }
+  const op = cm - manualFCF;
+  opEl.textContent = fmtM(op)+'백만'; opEl.style.color = op<0?'var(--rust)':'var(--ink)'; opRateEl.textContent='이익률 '+fmtPct(op/sales);
+}
+document.getElementById('vcInputF').addEventListener('input', e=>{ manualVCF = e.target.value===''?null:Number(e.target.value); renderProfitCalcForecast(); });
+document.getElementById('fcInputF').addEventListener('input', e=>{ manualFCF = e.target.value===''?null:Number(e.target.value); renderProfitCalcForecast(); });
 document.getElementById('vcInput').addEventListener('input', e=>{ manualVC = e.target.value===''?null:Number(e.target.value); renderProfitCalc(); });
 document.getElementById('fcInput').addEventListener('input', e=>{ manualFC = e.target.value===''?null:Number(e.target.value); renderProfitCalc(); });
 
@@ -551,6 +604,8 @@ function renderAll(){
   renderWeekTargetBox();
   renderKPI();
   renderProfitCalc();
+  renderKPIForecast();
+  renderProfitCalcForecast();
   document.getElementById('julySection').style.display = selectedMonth==='2026-07' ? 'block' : 'none';
   if(selectedMonth==='2026-07'){
     renderWeekTabs();
