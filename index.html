@@ -397,18 +397,39 @@ function renderKPI(){
 
 const DAYS_IN_JULY = 31;
 function getForecastFigures(){
-  const dlist = julyPeriodDays(); // full month-to-date, regardless of week/toggle selection
-  const daysWithData = dlist.length;
-  const sales = dlist.reduce((a,d)=>a+d.sales,0);
-  const cost = dlist.reduce((a,d)=>a+d.cost,0);
-  const factor = daysWithData ? DAYS_IN_JULY/daysWithData : 1;
-  return { sales: sales*factor, cost: cost*factor, daysWithData };
+  const dlist = julyPeriodDays();
+  const daysWithData = dlist.length; // whole-dataset date range (for the label only)
+
+  // per-item quantity-driven projection: each item's own active-day pace is
+  // extrapolated to the full month, then cost/revenue are re-derived from
+  // that projected quantity so cost genuinely moves with volume (not just
+  // scaled alongside revenue by one blanket factor).
+  const byItem = {}; // code -> {qty, sales, cost, days:Set}
+  txRows.forEach(r=>{
+    if(!byItem[r.code]) byItem[r.code] = {qty:0, sales:0, cost:0, days:new Set()};
+    const it = byItem[r.code];
+    it.qty += r.qty; it.sales += r.sales; it.cost += r.cost;
+    it.days.add(r.date);
+  });
+
+  let sales = 0, cost = 0;
+  Object.entries(byItem).forEach(([code, it])=>{
+    const activeDays = it.days.size || 1;
+    const qtyFactor = DAYS_IN_JULY/activeDays;
+    const projectedQty = it.qty * qtyFactor;
+    const avgPrice = it.qty ? it.sales/it.qty : 0;
+    const unitCostVal = unitCost[code] || 0;
+    sales += projectedQty * avgPrice;
+    cost += projectedQty * unitCostVal;
+  });
+
+  return { sales, cost, daysWithData };
 }
 function renderKPIForecast(){
   const grid = document.getElementById('kpiGridForecast');
   const { sales, cost, daysWithData } = getForecastFigures();
   const margin = sales - cost;
-  document.getElementById('forecastAsOfLabel').textContent = `7/1~${DAYS_IN_JULY}일 예측 (실적 ${daysWithData}일치 × ${DAYS_IN_JULY}/${daysWithData} 일할 환산)`;
+  document.getElementById('forecastAsOfLabel').textContent = `품목별 판매 수량을 각 품목의 실제 판매일수 기준으로 31일까지 환산 → 품목 원가단가 재적용 (전체 실적 ${daysWithData}일치)`;
   grid.innerHTML = `
     <div class="kpi-card"><div class="k">매출</div><div class="v">${fmtM(sales)}백만</div><div class="sub">${fmtWon(sales)}</div></div>
     <div class="kpi-card"><div class="k">매출원가</div><div class="v">${fmtM(cost)}백만</div><div class="sub">${fmtWon(cost)}</div></div>
