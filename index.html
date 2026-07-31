@@ -211,7 +211,7 @@
 <script>
 // ---- Sheet sources ----
 const MAIN_SHEET = '11k69kRVVp7f1C3CADD81ytG6weKpPRB1ON9FR-1_4eo';
-const GID_TRANSACTIONS = '1894671080';   // 거래명세서품목조회(원본)
+const GID_TRANSACTIONS = '1096885211';   // 거래명세서품목조회(원본)
 const GID_COST = '1259280377';           // 7월(진행중)
 const GID_TARGETS = '1882406292';        // 202606(판매)ERP
 
@@ -442,7 +442,7 @@ function renderKPI(){
     label = selectedMonth + ' 확정';
   }
   const margin = sales - cost;
-  document.getElementById('currentAsOfLabel').textContent = `${label} (2026-07-01~28 실적)`;
+  document.getElementById('currentAsOfLabel').textContent = `${label} (2026-07-01~31 실적)`;
   grid.innerHTML = `
     <div class="kpi-card"><div class="k">매출</div><div class="v">${fmtM(sales)}백만</div><div class="sub">${fmtWon(sales)}</div></div>
     <div class="kpi-card"><div class="k">매출원가</div><div class="v">${fmtM(cost)}백만</div><div class="sub">${fmtWon(cost)}</div></div>
@@ -573,12 +573,10 @@ function renderWeekTargetBox(){
   const t = targets.weeks.find(w=>w.week===selectedWeekTarget);
   const wdef = weeks.find(w=>w.week===selectedWeekTarget);
   const note = `${selectedWeekTarget} · ${wdef.start.slice(5).replace('-','.')}~${wdef.end.slice(5).replace('-','.')}`;
-  const est = selectedWeekTarget === '5주차';
-  box.innerHTML = `<div class="tb-subnote">${note}${est?' <span class="tb-est">(잠정)</span>':''}</div>
+  box.innerHTML = `<div class="tb-subnote">${note}</div>
     ${targetLine('매출목표', t.total.plan, t.total.actual, t.total.rate, 'total')}
     ${targetLine('G7 온라인', t.online.plan, t.online.actual, t.online.rate, 'sub')}
-    ${targetLine('G7 쿠팡', t.coupang.plan, t.coupang.actual, t.coupang.rate, 'sub')}
-    ${est?'<div style="font-size:11px;color:#A3D3D2;margin-top:4px;">※ 5주차 실적은 거래명세서 7/27~28 데이터 기준 잠정치입니다 (7/29~31 미반영)</div>':''}`;
+    ${targetLine('G7 쿠팡', t.coupang.plan, t.coupang.actual, t.coupang.rate, 'sub')}`;
 }
 document.querySelectorAll('#weekTargetToggle button').forEach(btn=>{
   btn.addEventListener('click', ()=>{
@@ -604,7 +602,7 @@ function renderWeekTabs(){
     b.onclick = ()=>{ selectedWeek=w.week; renderAll(); };
     wrap.appendChild(b);
   });
-  document.getElementById('weekRangeLabel').textContent = selectedWeek ? (weeks.find(w=>w.week===selectedWeek).start+'~'+weeks.find(w=>w.week===selectedWeek).end) : '2026-07-01~28';
+  document.getElementById('weekRangeLabel').textContent = selectedWeek ? (weeks.find(w=>w.week===selectedWeek).start+'~'+weeks.find(w=>w.week===selectedWeek).end) : '2026-07-01~31';
 }
 
 let dailyChart;
