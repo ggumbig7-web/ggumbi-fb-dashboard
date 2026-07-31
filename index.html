@@ -58,6 +58,17 @@
   tbody tr.total-row td{font-weight:700;background:#FBF6EC;}
   .neg{color:var(--rust);} .pos{color:var(--teal);}
   .table-scroll{max-height:460px;overflow-y:auto;}
+  .table-scroll-x{overflow-x:auto;}
+  table.chan-week-table{border-collapse:collapse;font-size:11px;white-space:nowrap;width:auto;}
+  table.chan-week-table th,table.chan-week-table td{padding:5px 8px;text-align:right;border-bottom:1px solid #F1EADC;}
+  table.chan-week-table td:first-child,table.chan-week-table th.chan-h{text-align:left;position:sticky;left:0;background:var(--card);z-index:1;font-weight:600;}
+  table.chan-week-table thead tr.grp th{font-size:11px;font-weight:700;color:#fff;text-align:center;padding:6px 8px;}
+  table.chan-week-table thead tr.sub th{font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:600;border-bottom:1px solid var(--card-border);}
+  table.chan-week-table tbody tr:hover{background:#FBF6EC;}
+  table.chan-week-table tr.total-row td{font-weight:700;background:#FBF6EC;}
+  table.chan-week-table .wk-plan{color:var(--muted);}
+  table.chan-week-table .wk-rate-good{color:var(--teal);font-weight:600;}
+  table.chan-week-table .wk-rate-bad{color:var(--rust);font-weight:600;}
 
   .pl-card{background:var(--blue-bg);border-radius:10px;padding:22px;margin-bottom:24px;border-left:4px solid var(--blue);}
   .pl-grid{display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:14px;align-items:end;}
@@ -123,6 +134,13 @@
     </div>
   </div>
   <div class="target-box" id="weekTargetBox"></div>
+
+  <div class="section-title"><h2>채널별 · 주차별 매출 실적</h2><span>목표: 202606(판매)ERP 시트 · 실적/매출이익: 거래명세서+원가단가 실시간 계산</span></div>
+  <div class="card">
+    <div class="table-scroll-x">
+      <table class="chan-week-table" id="chanWeekTable"></table>
+    </div>
+  </div>
 
   <div class="section-title"><h2>현재 기준</h2><span id="currentAsOfLabel"></span></div>
   <div class="kpi-grid" id="kpiGrid"></div>
@@ -251,6 +269,41 @@ let unitCost = {};        // 품번 -> 원가단가
 let txRows = [];          // {date, customer, code, name, qty, sales}
 let monthly = [];         // 1~7월 {month,is_actual,sales,cost}
 let targets = {weeks:[], monthly:null};
+let gRowsGlobal = null;   // raw 202606(판매)ERP rows, for channel-week table
+
+// Row numbers below correspond exactly to 202606(판매)ERP sheet rows.
+// 'customer' matches the 거래처 name in 거래명세서품목조회(원본) I열 exactly.
+const CHANNEL_MAP = [
+  {row:9,  customer:'쿠팡 주식회사', label:'Coupang (Direct)'},
+  {row:11, customer:'스토어팜(G7)', label:'Naver Smart Store'},
+  {row:12, customer:'주식회사 카카오', label:'Kakao'},
+  {row:15, customer:'주식회사 트라이씨클', label:'BoriBori'},
+  {row:16, customer:'주식회사 소브', label:'Coupang (Open) 소브'},
+  {row:17, customer:'주식회사 베스트유통', label:'Coupang (Open) 베유'},
+  {row:18, customer:'(주)에스에스지닷컴', label:'SSG'},
+  {row:21, customer:'롯데쇼핑(주)e커머스사업본부', label:'Lotte ON'},
+  {row:22, customer:'(주)우리홈쇼핑', label:'Lotteimall'},
+  {row:23, customer:'십일번가 주식회사', label:'11ST'},
+  {row:24, customer:'주식회사 현대홈쇼핑', label:'Hmall'},
+  {row:25, customer:'(주)엔에스쇼핑', label:'NS mall'},
+  {row:26, customer:'에스케이스토아(주)', label:'SK stoa'},
+  {row:27, customer:'(주)홈앤쇼핑', label:'Hns mall'},
+  {row:28, customer:'자사몰_G7', label:'Official Store'},
+  {row:29, customer:'주식회사 지마켓', label:'Ebay'},
+  {row:30, customer:'(주)씨제이이엔엠', label:'CJ'},
+  {row:31, customer:'(주)지에스리테일 홈쇼핑', label:'GS'},
+  {row:32, customer:'(주)더블유쇼핑', label:'W shopping'},
+  {row:33, customer:'주식회사 레브잇', label:'Always'},
+  {row:34, customer:'주식회사 현대이지웰', label:'Ezwell'},
+  {row:35, customer:'배달의 민족(G7)', label:'Baemin'},
+  {row:36, customer:'ALIEXPRESS KOREA LIMITED', label:'Ali Express'},
+  {row:38, customer:'주식회사 핌아시아', label:'Thirtymall'},
+  {row:39, customer:'테무 (ELMENTARY INNOVATION PTE.LTD)', label:'Temu'},
+  {row:40, customer:'주식회사 와이즐리컴퍼니', label:'Wisely'},
+  {row:41, customer:null, label:'기타 직매입+와디즈'},
+  {row:42, customer:'CJ워니버스(G7)', label:'CJ onvs'},
+  {row:43, customer:'(주) 비바리퍼블리카', label:'Toss'},
+];
 
 async function fetchCSV(sheetId, gid){
   const res = await fetch(csvUrl(sheetId, gid));
@@ -313,6 +366,7 @@ async function loadAll(){
 
   // 4) targets from 202606(판매)ERP fixed layout
   const gRows = await fetchCSV(MAIN_SHEET, GID_TARGETS);
+  gRowsGlobal = gRows;
   function cell(r, colLetters){ const row = gRows[r-1]; return row ? numVal(row[colIdx(colLetters)]) : 0; }
   const weekCols = [['AZ','BA'],['BD','BE'],['BH','BI'],['BL','BM'],['BP','BQ']];
   weeks.forEach((w,i)=>{
@@ -622,9 +676,86 @@ document.querySelectorAll('#dailyChanToggle button').forEach(btn=>{
   });
 });
 
+function computeChannelWeekData(){
+  function cell(r, colLetters){ const row = gRowsGlobal[r-1]; return row ? numVal(row[colIdx(colLetters)]) : 0; }
+  const weekCols = [['AZ','BA'],['BD','BE'],['BH','BI'],['BL','BM'],['BP','BQ']];
+  const matchedCustomers = new Set(CHANNEL_MAP.filter(c=>c.customer).map(c=>c.customer));
+
+  function actualCostFor(customer, start, end){
+    let actual=0, cost=0;
+    txRows.forEach(r=>{
+      const inRange = (!start || (r.date>=start && r.date<=end));
+      if(!inRange) return;
+      const match = customer ? r.customer===customer : !matchedCustomers.has(r.customer);
+      if(match){ actual+=r.sales; cost+=r.cost; }
+    });
+    return {actual, cost};
+  }
+
+  return CHANNEL_MAP.map(ch=>{
+    const weeksData = weeks.map((w,i)=>{
+      const plan = cell(ch.row, weekCols[i][0]);
+      const {actual, cost} = actualCostFor(ch.customer, w.start, w.end);
+      const margin = actual-cost;
+      return {plan, actual, margin, rate: actual? margin/actual:0, progress: plan? actual/plan:0};
+    });
+    const totalPlan = cell(ch.row, 'BT');
+    const {actual: totalActual, cost: totalCost} = actualCostFor(ch.customer, null, null);
+    const totalMargin = totalActual-totalCost;
+    return {
+      label: ch.label,
+      weeks: weeksData,
+      total: {plan:totalPlan, actual:totalActual, margin:totalMargin, rate: totalActual?totalMargin/totalActual:0, progress: totalPlan?totalActual/totalPlan:0}
+    };
+  });
+}
+
+function renderChanWeekTable(){
+  const table = document.getElementById('chanWeekTable');
+  const grpColors = ['#2A7D7B','#3D5A99','#2A7D7B','#3D5A99','#2A7D7B'];
+  let grpRow = '<tr class="grp"><th class="chan-h"></th>';
+  weeks.forEach((w,i)=> grpRow += `<th colspan="5" style="background:${grpColors[i]}">${w.week} (${w.start.slice(5)}~${w.end.slice(5)})</th>`);
+  grpRow += `<th colspan="5" style="background:var(--amber)">TTL (7.1~7.31)</th></tr>`;
+
+  let subRow = '<tr class="sub"><th class="chan-h">채널</th>';
+  for(let i=0;i<6;i++){ subRow += '<th>목표</th><th>실적</th><th>진척률</th><th>매출이익</th><th>이익률</th>'; }
+  subRow += '</tr>';
+
+  const data = computeChannelWeekData();
+  let body = '';
+  function cellsFor(w){
+    const progCls = w.progress>=0.8?'wk-rate-good':(w.progress<0.4?'wk-rate-bad':'');
+    const rateCls = w.rate<0.2?'wk-rate-bad':'wk-rate-good';
+    return `<td class="wk-plan">${fmtWon(w.plan)}</td><td>${fmtWon(w.actual)}</td><td class="${progCls}">${fmtPct(w.progress)}</td><td>${fmtWon(w.margin)}</td><td class="${rateCls}">${fmtPct(w.rate)}</td>`;
+  }
+  data.forEach(ch=>{
+    let row = `<tr><td>${ch.label}</td>`;
+    ch.weeks.forEach(w=>{ row += cellsFor(w); });
+    row += cellsFor(ch.total);
+    row += '</tr>';
+    body += row;
+  });
+  // grand total row across all channels
+  const grand = { weeks: weeks.map((w,i)=>({plan:0,actual:0,margin:0})), total:{plan:0,actual:0,margin:0} };
+  data.forEach(ch=>{
+    ch.weeks.forEach((w,i)=>{ grand.weeks[i].plan+=w.plan; grand.weeks[i].actual+=w.actual; grand.weeks[i].margin+=w.margin; });
+    grand.total.plan+=ch.total.plan; grand.total.actual+=ch.total.actual; grand.total.margin+=ch.total.margin;
+  });
+  grand.weeks.forEach(w=>{ w.rate=w.actual?w.margin/w.actual:0; w.progress=w.plan?w.actual/w.plan:0; });
+  grand.total.rate = grand.total.actual? grand.total.margin/grand.total.actual:0;
+  grand.total.progress = grand.total.plan? grand.total.actual/grand.total.plan:0;
+  let totalRow = '<tr class="total-row"><td>합계</td>';
+  grand.weeks.forEach(w=>{ totalRow += cellsFor(w); });
+  totalRow += cellsFor(grand.total) + '</tr>';
+  body += totalRow;
+
+  table.innerHTML = `<thead>${grpRow}${subRow}</thead><tbody>${body}</tbody>`;
+}
+
 function renderAll(){
   renderTargetBox();
   renderWeekTargetBox();
+  renderChanWeekTable();
   renderKPI();
   renderProfitCalc();
   renderKPIForecast();
