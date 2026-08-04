@@ -72,7 +72,9 @@
   table.chan-week-table .wk-rate-bad{color:var(--rust);font-weight:600;}
 
   .pl-card{background:var(--blue-bg);border-radius:10px;padding:22px;margin-bottom:24px;border-left:4px solid var(--blue);}
-  .pl-grid{display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:14px;align-items:end;}
+  .pl-grid{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:14px;align-items:end;}
+  .pl-cost-group{display:flex;flex-direction:column;}
+  .pl-cost-inputs{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
   .pl-input-box .lbl{font-size:11.5px;color:var(--blue);font-weight:700;margin-bottom:6px;}
   .pl-input-box input{width:100%;border:1px solid #C9DCEC;border-radius:8px;padding:10px 12px;font-family:-apple-system,'Apple SD Gothic Neo','Noto Sans KR',sans-serif;font-size:19px;font-weight:700;color:var(--blue);background:#fff;}
   .pl-input-box input::placeholder{font-weight:400;color:#9FB8D1;font-size:15px;}
@@ -108,6 +110,8 @@
   .week-note-title{width:100%;border:1px solid var(--card-border);border-radius:8px;padding:10px 12px;font-size:15px;font-weight:700;color:var(--ink);margin-bottom:10px;font-family:-apple-system,'Apple SD Gothic Neo','Noto Sans KR',sans-serif;}
   .week-note-content{width:100%;min-height:160px;border:1px solid var(--card-border);border-radius:8px;padding:12px;font-size:13.5px;line-height:1.6;color:var(--ink);font-family:-apple-system,'Apple SD Gothic Neo','Noto Sans KR',sans-serif;resize:vertical;}
   .week-note-header{display:flex;align-items:center;gap:10px;padding:18px 22px;cursor:pointer;user-select:none;}
+  .week-note-item{margin-bottom:14px;padding:0;overflow:hidden;}
+  .week-note-week-label{font-size:11.5px;color:var(--muted);font-weight:600;background:#F0E9DB;padding:3px 9px;border-radius:999px;flex-shrink:0;}
   .week-note-arrow{border:none;background:#F0E9DB;color:var(--muted);width:26px;height:26px;border-radius:7px;font-size:11px;cursor:pointer;flex-shrink:0;transition:transform .2s;}
   .week-note-arrow.collapsed{transform:rotate(-90deg);}
   .week-note-title-display{font-weight:700;font-size:14.5px;color:var(--ink);flex:1;}
@@ -122,7 +126,7 @@
 
   .loading{text-align:center;padding:60px 0;color:var(--muted);font-size:14px;}
   footer{margin-top:48px;padding-top:18px;border-top:1px solid var(--card-border);font-size:11.5px;color:var(--muted);}
-  @media (max-width:900px){.kpi-grid{grid-template-columns:1fr 1fr;} .grid-2{grid-template-columns:1fr;} .pl-grid{grid-template-columns:1fr 1fr;}}
+  @media (max-width:900px){.kpi-grid{grid-template-columns:1fr 1fr;} .grid-2{grid-template-columns:1fr;} .pl-grid{grid-template-columns:1fr;} .pl-cost-inputs{grid-template-columns:1fr 1fr;}}
 </style>
 </head>
 <body>
@@ -173,12 +177,13 @@
 
   <div class="pl-card">
     <div class="pl-grid">
-      <div class="pl-input-box">
-        <div class="lbl">변동비 (원)</div>
-        <input type="text" inputmode="numeric" id="vcInput" placeholder="예: 15,000,000">
-        <div class="pl-save-row"><button class="pl-save-btn" id="saveBtn">저장</button><span class="pl-save-status" id="saveStatus"></span></div>
+      <div class="pl-cost-group">
+        <div class="pl-cost-inputs">
+          <div class="pl-input-box"><div class="lbl">변동비 (원)</div><input type="text" inputmode="numeric" id="vcInput" placeholder="예: 15,000,000"></div>
+          <div class="pl-input-box"><div class="lbl">고정비 (원)</div><input type="text" inputmode="numeric" id="fcInput" placeholder="예: 35,000,000"></div>
+        </div>
+        <div class="pl-save-row"><button class="pl-save-btn" id="saveBtn">변동비·고정비 저장</button><span class="pl-save-status" id="saveStatus"></span></div>
       </div>
-      <div class="pl-input-box"><div class="lbl">고정비 (원)</div><input type="text" inputmode="numeric" id="fcInput" placeholder="예: 35,000,000"></div>
       <div class="pl-result"><div class="k">매출총이익</div><div class="v" id="plGross">-</div><div class="sub" id="plGrossRate">-</div></div>
       <div class="pl-result"><div class="k">공헌이익</div><div class="v" id="plCM">입력 필요</div><div class="sub" id="plCMRate">-</div></div>
       <div class="pl-result"><div class="k">영업이익</div><div class="v" id="plOP">입력 필요</div><div class="sub" id="plOPRate">-</div></div>
@@ -190,12 +195,13 @@
 
   <div class="pl-card">
     <div class="pl-grid">
-      <div class="pl-input-box">
-        <div class="lbl">변동비 (원)</div>
-        <input type="text" inputmode="numeric" id="vcInputF" placeholder="예: 15,000,000">
-        <div class="pl-save-row"><button class="pl-save-btn" id="saveBtnF">저장</button><span class="pl-save-status" id="saveStatusF"></span></div>
+      <div class="pl-cost-group">
+        <div class="pl-cost-inputs">
+          <div class="pl-input-box"><div class="lbl">변동비 (원)</div><input type="text" inputmode="numeric" id="vcInputF" placeholder="예: 15,000,000"></div>
+          <div class="pl-input-box"><div class="lbl">고정비 (원)</div><input type="text" inputmode="numeric" id="fcInputF" placeholder="예: 35,000,000"></div>
+        </div>
+        <div class="pl-save-row"><button class="pl-save-btn" id="saveBtnF">변동비·고정비 저장</button><span class="pl-save-status" id="saveStatusF"></span></div>
       </div>
-      <div class="pl-input-box"><div class="lbl">고정비 (원)</div><input type="text" inputmode="numeric" id="fcInputF" placeholder="예: 35,000,000"></div>
       <div class="pl-result"><div class="k">매출총이익</div><div class="v" id="plGrossF">-</div><div class="sub" id="plGrossRateF">-</div></div>
       <div class="pl-result"><div class="k">공헌이익</div><div class="v" id="plCMF">입력 필요</div><div class="sub" id="plCMRateF">-</div></div>
       <div class="pl-result"><div class="k">영업이익</div><div class="v" id="plOPF">입력 필요</div><div class="sub" id="plOPRateF">-</div></div>
@@ -237,17 +243,8 @@
       <div class="chart-box" style="height:440px;"><canvas id="dailyChart"></canvas></div>
     </div>
 
-    <div class="section-title"><h2>주차별 리포트 메모</h2><span id="weekNoteRangeLabel"></span></div>
-    <div class="card" id="weekNoteCard" style="padding:0;overflow:hidden;">
-      <div class="week-note-header" id="weekNoteHeader">
-        <button class="week-note-arrow" id="weekNoteArrow">▼</button>
-        <div class="week-note-title-display" id="weekNoteTitleDisplay">\uc81c\ubaa9 \uc5c6\uc74c</div>
-        <span class="pl-save-status" id="weekNoteSaveStatus"></span>
-      </div>
-      <div id="weekNoteBodyWrap" style="padding:0 22px 22px;">
-        <div id="weekNoteBody"></div>
-      </div>
-    </div>
+    <div class="section-title"><h2>주차별 리포트 메모</h2><span>대시보드 수치와 별개로 자유롭게 쓰는 정성적 보고 내용 (5개, 주차별 독립 저장)</span></div>
+    <div id="weekNoteList"></div>
   </div>
 
   <footer id="footerNote"></footer>
@@ -912,65 +909,102 @@ function saveNote(week, title, content, image){
     catch(e2){}
   }
 }
-let weekNoteExpanded = true;
-let pendingImage = null; // 저장 전 미리보기 중인 이미지(base64)
-function renderWeekNote(){
-  const body = document.getElementById('weekNoteBody');
-  const rangeLabelEl = document.getElementById('weekNoteRangeLabel');
-  const titleDisplay = document.getElementById('weekNoteTitleDisplay');
-  if(!selectedWeek){
-    rangeLabelEl.textContent = '';
-    titleDisplay.textContent = '주차를 선택하세요';
-    body.innerHTML = `<div style="color:var(--muted);font-size:13px;padding:4px 0 14px;">위 "7월 주차별 비교"에서 1~5주차 중 하나를 선택하면, 그 주차의 리포트 메모를 작성/확인할 수 있어요. (대시보드 수치와 별개로 자유롭게 쓰는 정성적 보고 내용입니다)</div>`;
-    return;
-  }
-  const w = weeks.find(x=>x.week===selectedWeek);
-  rangeLabelEl.textContent = `${selectedWeek} · ${w.start}~${w.end}`;
-  const note = loadNote(selectedWeek);
-  pendingImage = note.image || null;
-  titleDisplay.textContent = note.title || '제목 없음';
-  body.innerHTML = `
-    <input type="text" id="weekNoteTitle" class="week-note-title" placeholder="제목을 입력하세요 (예: 분석 메모, 이슈사항 등)" value="${escapeHtml(note.title)}">
-    <textarea id="weekNoteContent" class="week-note-content" placeholder="이번 주 보고 내용을 자유롭게 작성하세요 (프로모션, 이슈, 특이사항 등)">${escapeHtml(note.content)}</textarea>
-    <div class="week-note-image-row">
-      <button class="week-note-image-btn" id="weekNoteImageBtn">🖼 이미지 추가</button>
-      <input type="file" accept="image/*" id="weekNoteImageInput" style="display:none">
-    </div>
-    <div id="weekNoteImagePreviewWrap"></div>
-    <div class="pl-save-row" style="margin-top:14px;"><button class="pl-save-btn" id="weekNoteSaveBtn">저장</button></div>
-  `;
-  renderImagePreview();
+let pendingImages = {}; // week -> base64 (저장 전 미리보기용, 패널별 독립)
+let weekNoteExpandedMap = {}; // week -> boolean
 
-  document.getElementById('weekNoteImageBtn').addEventListener('click', ()=>{
-    document.getElementById('weekNoteImageInput').click();
+function weekIdx(week){ return weeks.findIndex(w=>w.week===week) + 1; } // 1~5
+
+function renderWeekNoteList(){
+  const list = document.getElementById('weekNoteList');
+  list.innerHTML = weeks.map(w=>{
+    const i = weekIdx(w.week);
+    return `
+    <div class="card week-note-item" id="weekNoteItem${i}">
+      <div class="week-note-header" data-week="${w.week}">
+        <button class="week-note-arrow collapsed" id="weekNoteArrow${i}">▼</button>
+        <span class="week-note-week-label">${w.week}</span>
+        <div class="week-note-title-display" id="weekNoteTitleDisplay${i}">제목 없음</div>
+        <span class="pl-save-status" id="weekNoteSaveStatus${i}"></span>
+      </div>
+      <div id="weekNoteBodyWrap${i}" style="display:none;padding:0 22px 22px;">
+        <div id="weekNoteBody${i}"></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  weeks.forEach(w=>{
+    const i = weekIdx(w.week);
+    document.querySelector(`#weekNoteItem${i} .week-note-header`).addEventListener('click', ()=>{
+      toggleWeekNote(w.week);
+    });
+    fillWeekNoteBody(w.week);
   });
-  document.getElementById('weekNoteImageInput').addEventListener('change', (e)=>{
+}
+
+function fillWeekNoteBody(week){
+  const i = weekIdx(week);
+  const note = loadNote(week);
+  pendingImages[week] = note.image || null;
+  document.getElementById(`weekNoteTitleDisplay${i}`).textContent = note.title || '제목 없음';
+  const body = document.getElementById(`weekNoteBody${i}`);
+  const w = weeks.find(x=>x.week===week);
+  body.innerHTML = `
+    <div style="font-size:11.5px;color:var(--muted);margin-bottom:10px;">${week} · ${w.start}~${w.end}</div>
+    <input type="text" id="weekNoteTitle${i}" class="week-note-title" placeholder="제목을 입력하세요 (예: 분석 메모, 이슈사항 등)" value="${escapeHtml(note.title)}">
+    <textarea id="weekNoteContent${i}" class="week-note-content" placeholder="이번 주 보고 내용을 자유롭게 작성하세요 (프로모션, 이슈, 특이사항 등)">${escapeHtml(note.content)}</textarea>
+    <div class="week-note-image-row">
+      <button class="week-note-image-btn" id="weekNoteImageBtn${i}">🖼 이미지 추가</button>
+      <input type="file" accept="image/*" id="weekNoteImageInput${i}" style="display:none">
+    </div>
+    <div id="weekNoteImagePreviewWrap${i}"></div>
+    <div class="pl-save-row" style="margin-top:14px;"><button class="pl-save-btn" id="weekNoteSaveBtn${i}">저장</button></div>
+  `;
+  renderImagePreview(week);
+
+  document.getElementById(`weekNoteImageBtn${i}`).addEventListener('click', ()=>{
+    document.getElementById(`weekNoteImageInput${i}`).click();
+  });
+  document.getElementById(`weekNoteImageInput${i}`).addEventListener('change', (e)=>{
     const file = e.target.files && e.target.files[0];
     if(!file) return;
     const reader = new FileReader();
-    reader.onload = ()=>{ pendingImage = reader.result; renderImagePreview(); };
+    reader.onload = ()=>{ pendingImages[week] = reader.result; renderImagePreview(week); };
     reader.readAsDataURL(file);
   });
-  document.getElementById('weekNoteSaveBtn').addEventListener('click', ()=>{
-    const title = document.getElementById('weekNoteTitle').value;
-    const content = document.getElementById('weekNoteContent').value;
-    saveNote(selectedWeek, title, content, pendingImage);
-    titleDisplay.textContent = title || '제목 없음';
-    flashSaved('weekNoteSaveStatus');
+  document.getElementById(`weekNoteSaveBtn${i}`).addEventListener('click', ()=>{
+    const title = document.getElementById(`weekNoteTitle${i}`).value;
+    const content = document.getElementById(`weekNoteContent${i}`).value;
+    saveNote(week, title, content, pendingImages[week]);
+    document.getElementById(`weekNoteTitleDisplay${i}`).textContent = title || '제목 없음';
+    flashSaved(`weekNoteSaveStatus${i}`);
   });
 }
-function renderImagePreview(){
-  const wrap = document.getElementById('weekNoteImagePreviewWrap');
+
+function renderImagePreview(week){
+  const i = weekIdx(week);
+  const wrap = document.getElementById(`weekNoteImagePreviewWrap${i}`);
   if(!wrap) return;
-  if(!pendingImage){ wrap.innerHTML = ''; return; }
-  wrap.innerHTML = `<div class="week-note-image-preview"><img src="${pendingImage}"><button class="week-note-image-remove" id="weekNoteImageRemove">✕</button></div>`;
-  document.getElementById('weekNoteImageRemove').addEventListener('click', ()=>{ pendingImage = null; renderImagePreview(); });
+  const img = pendingImages[week];
+  if(!img){ wrap.innerHTML = ''; return; }
+  wrap.innerHTML = `<div class="week-note-image-preview"><img src="${img}"><button class="week-note-image-remove" id="weekNoteImageRemove${i}">✕</button></div>`;
+  document.getElementById(`weekNoteImageRemove${i}`).addEventListener('click', ()=>{ pendingImages[week] = null; renderImagePreview(week); });
 }
-document.getElementById('weekNoteHeader').addEventListener('click', ()=>{
-  weekNoteExpanded = !weekNoteExpanded;
-  document.getElementById('weekNoteArrow').classList.toggle('collapsed', !weekNoteExpanded);
-  document.getElementById('weekNoteBodyWrap').style.display = weekNoteExpanded ? 'block' : 'none';
-});
+
+function toggleWeekNote(week, forceOpen){
+  const i = weekIdx(week);
+  const cur = !!weekNoteExpandedMap[week];
+  const next = forceOpen===undefined ? !cur : forceOpen;
+  weekNoteExpandedMap[week] = next;
+  document.getElementById(`weekNoteArrow${i}`).classList.toggle('collapsed', !next);
+  document.getElementById(`weekNoteBodyWrap${i}`).style.display = next ? 'block' : 'none';
+}
+
+// 위 "7월 주차별 비교"에서 주차 탭을 누르면, 그 주차에 해당하는 메모 패널을 자동으로 펼쳐줍니다.
+function syncWeekNoteWithSelectedWeek(){
+  if(!selectedWeek) return;
+  weeks.forEach(w=>{ if(w.week!==selectedWeek && weekNoteExpandedMap[w.week]) toggleWeekNote(w.week, false); });
+  toggleWeekNote(selectedWeek, true);
+}
 
 
 function renderAll(){
@@ -987,7 +1021,7 @@ function renderAll(){
     renderDaily();
     renderCustomers();
     renderItems();
-    renderWeekNote();
+    syncWeekNoteWithSelectedWeek();
   }
 }
 
@@ -996,6 +1030,7 @@ function renderAll(){
     await loadAll();
     loadSavedCosts();
     renderTopMonthToggle();
+    renderWeekNoteList();
     renderMonthChart();
     renderAll();
     document.getElementById('footerNote').textContent = '데이터 출처: 거래명세서품목조회(원본)(매출)·정리(원가, 7월 블록 W열)·202606(판매)ERP(목표) (GGUMBI F&B 원가관리 통합 데이터 시트), 26년 쿠팡 채널VS쿠팡 외 (F&B 마누스 로우데이터 시트) — 모두 구글시트에서 실시간 fetch';
