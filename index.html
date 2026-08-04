@@ -455,7 +455,17 @@ function renderKPI(){
 const DAYS_IN_JULY = 31;
 function getForecastFigures(){
   const dlist = julyPeriodDays();
-  const daysWithData = dlist.length; // whole-dataset date range (for the label only)
+  const daysWithData = dlist.length; // whole-dataset date range
+
+  // If the month is already fully covered (all 31 days present in the data),
+  // there's nothing left to project — use the actual totals as-is instead of
+  // extrapolating, since per-item active-day scaling would otherwise inflate
+  // items that simply weren't sold every single day.
+  if(daysWithData >= DAYS_IN_JULY){
+    const sales = dlist.reduce((a,d)=>a+d.sales,0);
+    const cost = dlist.reduce((a,d)=>a+d.cost,0);
+    return { sales, cost, daysWithData, isComplete:true };
+  }
 
   // per-item quantity-driven projection: each item's own active-day pace is
   // extrapolated to the full month, then cost/revenue are re-derived from
@@ -480,18 +490,20 @@ function getForecastFigures(){
     cost += projectedQty * unitCostVal;
   });
 
-  return { sales, cost, daysWithData };
+  return { sales, cost, daysWithData, isComplete:false };
 }
 function renderKPIForecast(){
   const grid = document.getElementById('kpiGridForecast');
-  const { sales, cost, daysWithData } = getForecastFigures();
+  const { sales, cost, daysWithData, isComplete } = getForecastFigures();
   const margin = sales - cost;
-  document.getElementById('forecastAsOfLabel').textContent = `품목별 판매 수량을 각 품목의 실제 판매일수 기준으로 31일까지 환산 → 품목 원가단가 재적용 (전체 실적 ${daysWithData}일치)`;
+  document.getElementById('forecastAsOfLabel').textContent = isComplete
+    ? `7월 전체(${daysWithData}일치) 데이터가 이미 다 들어와 있어 예측 없이 실적 그대로 표시 중`
+    : `품목별 판매 수량을 각 품목의 실제 판매일수 기준으로 31일까지 환산 → 품목 원가단가 재적용 (전체 실적 ${daysWithData}일치)`;
   grid.innerHTML = `
     <div class="kpi-card"><div class="k">매출</div><div class="v">${fmtM(sales)}백만</div><div class="sub">${fmtWon(sales)}</div></div>
     <div class="kpi-card"><div class="k">매출원가</div><div class="v">${fmtM(cost)}백만</div><div class="sub">${fmtWon(cost)}</div></div>
     <div class="kpi-card"><div class="k">매출총이익</div><div class="v">${fmtM(margin)}백만</div><div class="sub">${fmtWon(margin)}</div></div>
-    <div class="kpi-card"><div class="k">이익률</div><div class="v">${fmtPct(margin/sales)}</div><div class="sub">예상 마감</div></div>
+    <div class="kpi-card"><div class="k">이익률</div><div class="v">${fmtPct(margin/sales)}</div><div class="sub">${isComplete?'7월 확정':'예상 마감'}</div></div>
   `;
 }
 
