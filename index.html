@@ -107,6 +107,15 @@
   .chan-toggle button.month-disabled{opacity:.4;cursor:default;}
   .week-note-title{width:100%;border:1px solid var(--card-border);border-radius:8px;padding:10px 12px;font-size:15px;font-weight:700;color:var(--ink);margin-bottom:10px;font-family:-apple-system,'Apple SD Gothic Neo','Noto Sans KR',sans-serif;}
   .week-note-content{width:100%;min-height:160px;border:1px solid var(--card-border);border-radius:8px;padding:12px;font-size:13.5px;line-height:1.6;color:var(--ink);font-family:-apple-system,'Apple SD Gothic Neo','Noto Sans KR',sans-serif;resize:vertical;}
+  .week-note-header{display:flex;align-items:center;gap:10px;padding:18px 22px;cursor:pointer;user-select:none;}
+  .week-note-arrow{border:none;background:#F0E9DB;color:var(--muted);width:26px;height:26px;border-radius:7px;font-size:11px;cursor:pointer;flex-shrink:0;transition:transform .2s;}
+  .week-note-arrow.collapsed{transform:rotate(-90deg);}
+  .week-note-title-display{font-weight:700;font-size:14.5px;color:var(--ink);flex:1;}
+  .week-note-image-row{display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap;}
+  .week-note-image-btn{border:1px dashed #C9DCEC;background:#fff;color:var(--blue);font-size:12.5px;font-weight:600;padding:8px 14px;border-radius:8px;cursor:pointer;}
+  .week-note-image-preview{position:relative;display:inline-block;margin-top:12px;}
+  .week-note-image-preview img{max-width:320px;max-height:220px;border-radius:8px;border:1px solid var(--card-border);display:block;}
+  .week-note-image-remove{position:absolute;top:-8px;right:-8px;background:var(--rust);color:#fff;border:none;width:22px;height:22px;border-radius:50%;font-size:12px;cursor:pointer;line-height:1;}
   .chan-toggle button{border:none;background:transparent;padding:6px 14px;border-radius:8px;font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer;}
   .chan-toggle button.active{background:#fff;color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.08);}
   .search{border:1px solid var(--card-border);border-radius:10px;padding:8px 14px;font-size:13px;width:200px;}
@@ -229,8 +238,15 @@
     </div>
 
     <div class="section-title"><h2>주차별 리포트 메모</h2><span id="weekNoteRangeLabel"></span></div>
-    <div class="card" id="weekNoteCard">
-      <div id="weekNoteBody"></div>
+    <div class="card" id="weekNoteCard" style="padding:0;overflow:hidden;">
+      <div class="week-note-header" id="weekNoteHeader">
+        <button class="week-note-arrow" id="weekNoteArrow">▼</button>
+        <div class="week-note-title-display" id="weekNoteTitleDisplay">\uc81c\ubaa9 \uc5c6\uc74c</div>
+        <span class="pl-save-status" id="weekNoteSaveStatus"></span>
+      </div>
+      <div id="weekNoteBodyWrap" style="padding:0 22px 22px;">
+        <div id="weekNoteBody"></div>
+      </div>
     </div>
   </div>
 
@@ -884,35 +900,78 @@ function noteKey(week){ return `ggumbi_note_${selectedMonth}_${week}`; }
 function loadNote(week){
   try {
     const raw = localStorage.getItem(noteKey(week));
-    return raw ? JSON.parse(raw) : {title:'', content:''};
-  } catch(e){ return {title:'', content:''}; }
+    return raw ? JSON.parse(raw) : {title:'', content:'', image:null};
+  } catch(e){ return {title:'', content:'', image:null}; }
 }
-function saveNote(week, title, content){
-  localStorage.setItem(noteKey(week), JSON.stringify({title, content}));
+function saveNote(week, title, content, image){
+  try {
+    localStorage.setItem(noteKey(week), JSON.stringify({title, content, image}));
+  } catch(e){
+    // 이미지가 너무 커서 저장 용량을 초과한 경우, 이미지 없이 텍스트만이라도 저장
+    try { localStorage.setItem(noteKey(week), JSON.stringify({title, content, image:null})); alert('이미지 용량이 너무 커서 이미지는 저장하지 못했어요. 더 작은 이미지로 다시 시도해주세요.'); }
+    catch(e2){}
+  }
 }
+let weekNoteExpanded = true;
+let pendingImage = null; // 저장 전 미리보기 중인 이미지(base64)
 function renderWeekNote(){
   const body = document.getElementById('weekNoteBody');
   const rangeLabelEl = document.getElementById('weekNoteRangeLabel');
+  const titleDisplay = document.getElementById('weekNoteTitleDisplay');
   if(!selectedWeek){
     rangeLabelEl.textContent = '';
-    body.innerHTML = `<div style="color:var(--muted);font-size:13px;padding:4px 0 8px;">위 "7월 주차별 비교"에서 1~5주차 중 하나를 선택하면, 그 주차의 리포트 메모를 작성/확인할 수 있어요. (대시보드 수치와 별개로 자유롭게 쓰는 정성적 보고 내용입니다)</div>`;
+    titleDisplay.textContent = '주차를 선택하세요';
+    body.innerHTML = `<div style="color:var(--muted);font-size:13px;padding:4px 0 14px;">위 "7월 주차별 비교"에서 1~5주차 중 하나를 선택하면, 그 주차의 리포트 메모를 작성/확인할 수 있어요. (대시보드 수치와 별개로 자유롭게 쓰는 정성적 보고 내용입니다)</div>`;
     return;
   }
   const w = weeks.find(x=>x.week===selectedWeek);
   rangeLabelEl.textContent = `${selectedWeek} · ${w.start}~${w.end}`;
   const note = loadNote(selectedWeek);
+  pendingImage = note.image || null;
+  titleDisplay.textContent = note.title || '제목 없음';
   body.innerHTML = `
-    <input type="text" id="weekNoteTitle" class="week-note-title" placeholder="제목을 입력하세요" value="${escapeHtml(note.title)}">
+    <input type="text" id="weekNoteTitle" class="week-note-title" placeholder="제목을 입력하세요 (예: 분석 메모, 이슈사항 등)" value="${escapeHtml(note.title)}">
     <textarea id="weekNoteContent" class="week-note-content" placeholder="이번 주 보고 내용을 자유롭게 작성하세요 (프로모션, 이슈, 특이사항 등)">${escapeHtml(note.content)}</textarea>
-    <div class="pl-save-row"><button class="pl-save-btn" id="weekNoteSaveBtn">저장</button><span class="pl-save-status" id="weekNoteSaveStatus"></span></div>
+    <div class="week-note-image-row">
+      <button class="week-note-image-btn" id="weekNoteImageBtn">🖼 이미지 추가</button>
+      <input type="file" accept="image/*" id="weekNoteImageInput" style="display:none">
+    </div>
+    <div id="weekNoteImagePreviewWrap"></div>
+    <div class="pl-save-row" style="margin-top:14px;"><button class="pl-save-btn" id="weekNoteSaveBtn">저장</button></div>
   `;
+  renderImagePreview();
+
+  document.getElementById('weekNoteImageBtn').addEventListener('click', ()=>{
+    document.getElementById('weekNoteImageInput').click();
+  });
+  document.getElementById('weekNoteImageInput').addEventListener('change', (e)=>{
+    const file = e.target.files && e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = ()=>{ pendingImage = reader.result; renderImagePreview(); };
+    reader.readAsDataURL(file);
+  });
   document.getElementById('weekNoteSaveBtn').addEventListener('click', ()=>{
     const title = document.getElementById('weekNoteTitle').value;
     const content = document.getElementById('weekNoteContent').value;
-    saveNote(selectedWeek, title, content);
+    saveNote(selectedWeek, title, content, pendingImage);
+    titleDisplay.textContent = title || '제목 없음';
     flashSaved('weekNoteSaveStatus');
   });
 }
+function renderImagePreview(){
+  const wrap = document.getElementById('weekNoteImagePreviewWrap');
+  if(!wrap) return;
+  if(!pendingImage){ wrap.innerHTML = ''; return; }
+  wrap.innerHTML = `<div class="week-note-image-preview"><img src="${pendingImage}"><button class="week-note-image-remove" id="weekNoteImageRemove">✕</button></div>`;
+  document.getElementById('weekNoteImageRemove').addEventListener('click', ()=>{ pendingImage = null; renderImagePreview(); });
+}
+document.getElementById('weekNoteHeader').addEventListener('click', ()=>{
+  weekNoteExpanded = !weekNoteExpanded;
+  document.getElementById('weekNoteArrow').classList.toggle('collapsed', !weekNoteExpanded);
+  document.getElementById('weekNoteBodyWrap').style.display = weekNoteExpanded ? 'block' : 'none';
+});
+
 
 function renderAll(){
   renderTargetBox();
