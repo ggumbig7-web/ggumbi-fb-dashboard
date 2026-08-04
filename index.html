@@ -76,6 +76,11 @@
   .pl-input-box .lbl{font-size:11.5px;color:var(--blue);font-weight:700;margin-bottom:6px;}
   .pl-input-box input{width:100%;border:1px solid #C9DCEC;border-radius:8px;padding:10px 12px;font-family:-apple-system,'Apple SD Gothic Neo','Noto Sans KR',sans-serif;font-size:19px;font-weight:700;color:var(--blue);background:#fff;}
   .pl-input-box input::placeholder{font-weight:400;color:#9FB8D1;font-size:15px;}
+  .pl-save-row{display:flex;align-items:center;gap:8px;margin-top:8px;}
+  .pl-save-btn{border:none;background:var(--blue);color:#fff;font-size:12px;font-weight:600;padding:6px 14px;border-radius:7px;cursor:pointer;}
+  .pl-save-btn:hover{opacity:.88;}
+  .pl-save-status{font-size:11.5px;color:var(--teal);opacity:0;transition:opacity .25s;}
+  .pl-save-status.show{opacity:1;}
   .pl-result .k{font-size:11.5px;color:var(--muted);font-weight:600;text-transform:uppercase;}
   .pl-result .v{font-family:-apple-system,'Apple SD Gothic Neo','Noto Sans KR',sans-serif;font-size:20px;font-weight:600;margin:6px 0 2px;}
   .pl-result .sub{font-size:11.5px;color:var(--muted);}
@@ -97,6 +102,11 @@
 
   .controls{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:12px;flex-wrap:wrap;}
   .chan-toggle{display:flex;gap:4px;background:#F0E9DB;border-radius:10px;padding:3px;}
+  .month-toggle-row{display:flex;align-items:center;gap:12px;margin-bottom:22px;}
+  .month-toggle-note{font-size:12px;color:var(--muted);}
+  .chan-toggle button.month-disabled{opacity:.4;cursor:default;}
+  .week-note-title{width:100%;border:1px solid var(--card-border);border-radius:8px;padding:10px 12px;font-size:15px;font-weight:700;color:var(--ink);margin-bottom:10px;font-family:-apple-system,'Apple SD Gothic Neo','Noto Sans KR',sans-serif;}
+  .week-note-content{width:100%;min-height:160px;border:1px solid var(--card-border);border-radius:8px;padding:12px;font-size:13.5px;line-height:1.6;color:var(--ink);font-family:-apple-system,'Apple SD Gothic Neo','Noto Sans KR',sans-serif;resize:vertical;}
   .chan-toggle button{border:none;background:transparent;padding:6px 14px;border-radius:8px;font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer;}
   .chan-toggle button.active{background:#fff;color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.08);}
   .search{border:1px solid var(--card-border);border-radius:10px;padding:8px 14px;font-size:13px;width:200px;}
@@ -121,6 +131,11 @@
 
   <div id="loadingMsg" class="loading">데이터를 불러오는 중입니다...</div>
   <div id="mainContent" style="display:none;">
+
+  <div class="month-toggle-row">
+    <div class="chan-toggle" id="topMonthToggle"></div>
+    <span class="month-toggle-note" id="topMonthNote"></span>
+  </div>
 
   <div class="section-title"><h2>7월 월간 목표 대비 실적</h2><span>VAT별도, 202606(판매)ERP 시트 실시간 연동</span></div>
   <div class="target-box" id="targetBox"></div>
@@ -149,7 +164,11 @@
 
   <div class="pl-card">
     <div class="pl-grid">
-      <div class="pl-input-box"><div class="lbl">변동비 (원)</div><input type="text" inputmode="numeric" id="vcInput" placeholder="예: 15,000,000"></div>
+      <div class="pl-input-box">
+        <div class="lbl">변동비 (원)</div>
+        <input type="text" inputmode="numeric" id="vcInput" placeholder="예: 15,000,000">
+        <div class="pl-save-row"><button class="pl-save-btn" id="saveBtn">저장</button><span class="pl-save-status" id="saveStatus"></span></div>
+      </div>
       <div class="pl-input-box"><div class="lbl">고정비 (원)</div><input type="text" inputmode="numeric" id="fcInput" placeholder="예: 35,000,000"></div>
       <div class="pl-result"><div class="k">매출총이익</div><div class="v" id="plGross">-</div><div class="sub" id="plGrossRate">-</div></div>
       <div class="pl-result"><div class="k">공헌이익</div><div class="v" id="plCM">입력 필요</div><div class="sub" id="plCMRate">-</div></div>
@@ -162,7 +181,11 @@
 
   <div class="pl-card">
     <div class="pl-grid">
-      <div class="pl-input-box"><div class="lbl">변동비 (원)</div><input type="text" inputmode="numeric" id="vcInputF" placeholder="예: 15,000,000"></div>
+      <div class="pl-input-box">
+        <div class="lbl">변동비 (원)</div>
+        <input type="text" inputmode="numeric" id="vcInputF" placeholder="예: 15,000,000">
+        <div class="pl-save-row"><button class="pl-save-btn" id="saveBtnF">저장</button><span class="pl-save-status" id="saveStatusF"></span></div>
+      </div>
       <div class="pl-input-box"><div class="lbl">고정비 (원)</div><input type="text" inputmode="numeric" id="fcInputF" placeholder="예: 35,000,000"></div>
       <div class="pl-result"><div class="k">매출총이익</div><div class="v" id="plGrossF">-</div><div class="sub" id="plGrossRateF">-</div></div>
       <div class="pl-result"><div class="k">공헌이익</div><div class="v" id="plCMF">입력 필요</div><div class="sub" id="plCMRateF">-</div></div>
@@ -174,19 +197,6 @@
   <div class="card"><div class="chart-box" style="height:260px;"><canvas id="monthChart"></canvas></div></div>
 
   <div id="julySection" style="display:none;">
-    <div class="section-title"><h2>7월 주차별 비교</h2><span id="weekRangeLabel"></span></div>
-    <div class="week-tabs" id="weekTabs"></div>
-    <div class="card">
-      <div class="controls" style="justify-content:flex-end;margin-bottom:6px;">
-        <div class="chan-toggle" id="dailyChanToggle">
-          <button data-ch="전체" class="active">전체</button>
-          <button data-ch="쿠팡">쿠팡</button>
-          <button data-ch="쿠팡외">쿠팡 외</button>
-        </div>
-      </div>
-      <div class="chart-box" style="height:440px;"><canvas id="dailyChart"></canvas></div>
-    </div>
-
     <div class="section-title"><h2>거래처별 매출·매출이익</h2><span id="customerPeriodLabel"></span></div>
     <div class="card">
       <h3>거래처별 상세</h3>
@@ -203,6 +213,24 @@
       <div class="table-scroll">
       <table><thead><tr><th>#</th><th>품목</th><th>수량</th><th>매출</th><th>원가</th><th>마진</th><th>마진율</th></tr></thead><tbody id="itemBody"></tbody></table>
       </div>
+    </div>
+
+    <div class="section-title"><h2>7월 주차별 비교</h2><span id="weekRangeLabel"></span></div>
+    <div class="week-tabs" id="weekTabs"></div>
+    <div class="card">
+      <div class="controls" style="justify-content:flex-end;margin-bottom:6px;">
+        <div class="chan-toggle" id="dailyChanToggle">
+          <button data-ch="전체" class="active">전체</button>
+          <button data-ch="쿠팡">쿠팡</button>
+          <button data-ch="쿠팡외">쿠팡 외</button>
+        </div>
+      </div>
+      <div class="chart-box" style="height:440px;"><canvas id="dailyChart"></canvas></div>
+    </div>
+
+    <div class="section-title"><h2>주차별 리포트 메모</h2><span id="weekNoteRangeLabel"></span></div>
+    <div class="card" id="weekNoteCard">
+      <div id="weekNoteBody"></div>
     </div>
   </div>
 
@@ -563,10 +591,51 @@ function bindMoneyInput(id, setter, rerender){
     rerender();
   });
 }
-bindMoneyInput('vcInputF', v=>manualVCF=v, renderProfitCalcForecast);
-bindMoneyInput('fcInputF', v=>manualFCF=v, renderProfitCalcForecast);
+function proRateFactor(){
+  const currentDays = julyPeriodDays().length;
+  return DAYS_IN_JULY ? currentDays/DAYS_IN_JULY : 1;
+}
+function fillProRated(targetId, fullValue, setter, rerender){
+  const el = document.getElementById(targetId);
+  if(fullValue==null){ setter(null); el.value=''; rerender(); return; }
+  const prorated = Math.round(fullValue * proRateFactor());
+  setter(prorated);
+  el.value = prorated.toLocaleString('ko-KR');
+  rerender();
+}
+bindMoneyInput('vcInputF', v=>{ manualVCF=v; fillProRated('vcInput', v, x=>manualVC=x, renderProfitCalc); }, renderProfitCalcForecast);
+bindMoneyInput('fcInputF', v=>{ manualFCF=v; fillProRated('fcInput', v, x=>manualFC=x, renderProfitCalc); }, renderProfitCalcForecast);
 bindMoneyInput('vcInput', v=>manualVC=v, renderProfitCalc);
 bindMoneyInput('fcInput', v=>manualFC=v, renderProfitCalc);
+
+const LS_KEYS = { vc:'ggumbi_vc', fc:'ggumbi_fc', vcF:'ggumbi_vcF', fcF:'ggumbi_fcF' };
+function loadSavedCosts(){
+  const vc = localStorage.getItem(LS_KEYS.vc);
+  const fc = localStorage.getItem(LS_KEYS.fc);
+  const vcF = localStorage.getItem(LS_KEYS.vcF);
+  const fcF = localStorage.getItem(LS_KEYS.fcF);
+  if(vc!=null){ manualVC=Number(vc); document.getElementById('vcInput').value = manualVC.toLocaleString('ko-KR'); }
+  if(fc!=null){ manualFC=Number(fc); document.getElementById('fcInput').value = manualFC.toLocaleString('ko-KR'); }
+  if(vcF!=null){ manualVCF=Number(vcF); document.getElementById('vcInputF').value = manualVCF.toLocaleString('ko-KR'); }
+  if(fcF!=null){ manualFCF=Number(fcF); document.getElementById('fcInputF').value = manualFCF.toLocaleString('ko-KR'); }
+}
+function flashSaved(id){
+  const el = document.getElementById(id);
+  el.textContent = '저장됨 \u2713';
+  el.classList.add('show');
+  clearTimeout(el._t);
+  el._t = setTimeout(()=>el.classList.remove('show'), 2000);
+}
+document.getElementById('saveBtn').addEventListener('click', ()=>{
+  if(manualVC!=null) localStorage.setItem(LS_KEYS.vc, manualVC); else localStorage.removeItem(LS_KEYS.vc);
+  if(manualFC!=null) localStorage.setItem(LS_KEYS.fc, manualFC); else localStorage.removeItem(LS_KEYS.fc);
+  flashSaved('saveStatus');
+});
+document.getElementById('saveBtnF').addEventListener('click', ()=>{
+  if(manualVCF!=null) localStorage.setItem(LS_KEYS.vcF, manualVCF); else localStorage.removeItem(LS_KEYS.vcF);
+  if(manualFCF!=null) localStorage.setItem(LS_KEYS.fcF, manualFCF); else localStorage.removeItem(LS_KEYS.fcF);
+  flashSaved('saveStatusF');
+});
 
 let monthChart;
 function renderMonthChart(){
@@ -790,6 +859,61 @@ function renderChanWeekTable(){
   table.innerHTML = `<thead>${grpRow}${subRow}</thead><tbody>${body}</tbody>`;
 }
 
+// 월별 토글 설정 — 다음 달 데이터가 준비되면 이 배열에 항목만 추가하면 됩니다.
+const AVAILABLE_MONTHS = [
+  {key:'2026-07', label:'7월'},
+];
+function renderTopMonthToggle(){
+  const wrap = document.getElementById('topMonthToggle');
+  wrap.innerHTML = AVAILABLE_MONTHS.map(m=>
+    `<button data-month="${m.key}" class="${m.key==='2026-07'?'active':''}">${m.label}</button>`
+  ).join('');
+  wrap.querySelectorAll('button').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      wrap.querySelectorAll('button').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      // 지금은 7월 데이터만 있어서 다른 달을 눌러도 전환할 데이터가 없습니다.
+      // 다음 달 데이터가 들어오면 여기서 selectedMonth를 바꾸고 loadAll()을 다시 태우도록 연결하면 됩니다.
+    });
+  });
+  document.getElementById('topMonthNote').textContent = '다음 달 데이터가 준비되면 이 자리에 새 달 버튼이 추가됩니다.';
+}
+
+function escapeHtml(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function noteKey(week){ return `ggumbi_note_${selectedMonth}_${week}`; }
+function loadNote(week){
+  try {
+    const raw = localStorage.getItem(noteKey(week));
+    return raw ? JSON.parse(raw) : {title:'', content:''};
+  } catch(e){ return {title:'', content:''}; }
+}
+function saveNote(week, title, content){
+  localStorage.setItem(noteKey(week), JSON.stringify({title, content}));
+}
+function renderWeekNote(){
+  const body = document.getElementById('weekNoteBody');
+  const rangeLabelEl = document.getElementById('weekNoteRangeLabel');
+  if(!selectedWeek){
+    rangeLabelEl.textContent = '';
+    body.innerHTML = `<div style="color:var(--muted);font-size:13px;padding:4px 0 8px;">위 "7월 주차별 비교"에서 1~5주차 중 하나를 선택하면, 그 주차의 리포트 메모를 작성/확인할 수 있어요. (대시보드 수치와 별개로 자유롭게 쓰는 정성적 보고 내용입니다)</div>`;
+    return;
+  }
+  const w = weeks.find(x=>x.week===selectedWeek);
+  rangeLabelEl.textContent = `${selectedWeek} · ${w.start}~${w.end}`;
+  const note = loadNote(selectedWeek);
+  body.innerHTML = `
+    <input type="text" id="weekNoteTitle" class="week-note-title" placeholder="제목을 입력하세요" value="${escapeHtml(note.title)}">
+    <textarea id="weekNoteContent" class="week-note-content" placeholder="이번 주 보고 내용을 자유롭게 작성하세요 (프로모션, 이슈, 특이사항 등)">${escapeHtml(note.content)}</textarea>
+    <div class="pl-save-row"><button class="pl-save-btn" id="weekNoteSaveBtn">저장</button><span class="pl-save-status" id="weekNoteSaveStatus"></span></div>
+  `;
+  document.getElementById('weekNoteSaveBtn').addEventListener('click', ()=>{
+    const title = document.getElementById('weekNoteTitle').value;
+    const content = document.getElementById('weekNoteContent').value;
+    saveNote(selectedWeek, title, content);
+    flashSaved('weekNoteSaveStatus');
+  });
+}
+
 function renderAll(){
   renderTargetBox();
   renderWeekTargetBox();
@@ -804,12 +928,15 @@ function renderAll(){
     renderDaily();
     renderCustomers();
     renderItems();
+    renderWeekNote();
   }
 }
 
 (async function init(){
   try{
     await loadAll();
+    loadSavedCosts();
+    renderTopMonthToggle();
     renderMonthChart();
     renderAll();
     document.getElementById('footerNote').textContent = '데이터 출처: 거래명세서품목조회(원본)(매출)·정리(원가, 7월 블록 W열)·202606(판매)ERP(목표) (GGUMBI F&B 원가관리 통합 데이터 시트), 26년 쿠팡 채널VS쿠팡 외 (F&B 마누스 로우데이터 시트) — 모두 구글시트에서 실시간 fetch';
