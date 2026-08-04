@@ -183,6 +183,7 @@
           <div class="pl-input-box"><div class="lbl">고정비 (원)</div><input type="text" inputmode="numeric" id="fcInput" placeholder="예: 35,000,000"></div>
         </div>
         <div class="pl-save-row"><button class="pl-save-btn" id="saveBtn">변동비·고정비 저장</button><span class="pl-save-status" id="saveStatus"></span></div>
+        <div style="font-size:11px;color:var(--muted);margin-top:6px;">※ 예상마감에서 저장하면 이 값도 자동으로 같이 저장돼요. 여기서 직접 다른 값으로 덮어쓰고 싶을 때만 따로 눌러주세요.</div>
       </div>
       <div class="pl-result"><div class="k">매출총이익</div><div class="v" id="plGross">-</div><div class="sub" id="plGrossRate">-</div></div>
       <div class="pl-result"><div class="k">공헌이익</div><div class="v" id="plCM">입력 필요</div><div class="sub" id="plCMRate">-</div></div>
@@ -200,7 +201,7 @@
           <div class="pl-input-box"><div class="lbl">변동비 (원)</div><input type="text" inputmode="numeric" id="vcInputF" placeholder="예: 15,000,000"></div>
           <div class="pl-input-box"><div class="lbl">고정비 (원)</div><input type="text" inputmode="numeric" id="fcInputF" placeholder="예: 35,000,000"></div>
         </div>
-        <div class="pl-save-row"><button class="pl-save-btn" id="saveBtnF">변동비·고정비 저장</button><span class="pl-save-status" id="saveStatusF"></span></div>
+        <div class="pl-save-row"><button class="pl-save-btn" id="saveBtnF">변동비·고정비 저장 (현재기준도 함께)</button><span class="pl-save-status" id="saveStatusF"></span></div>
       </div>
       <div class="pl-result"><div class="k">매출총이익</div><div class="v" id="plGrossF">-</div><div class="sub" id="plGrossRateF">-</div></div>
       <div class="pl-result"><div class="k">공헌이익</div><div class="v" id="plCMF">입력 필요</div><div class="sub" id="plCMRateF">-</div></div>
@@ -243,7 +244,7 @@
       <div class="chart-box" style="height:440px;"><canvas id="dailyChart"></canvas></div>
     </div>
 
-    <div class="section-title"><h2>주차별 리포트 메모</h2><span>대시보드 수치와 별개로 자유롭게 쓰는 정성적 보고 내용 (5개, 주차별 독립 저장)</span></div>
+    <div class="section-title"><h2>주차별 리포트 메모</h2><span id="weekNoteSectionNote">위에서 주차를 선택하면 그 주차의 메모 5개가 나옵니다</span></div>
     <div id="weekNoteList"></div>
   </div>
 
@@ -639,16 +640,25 @@ function flashSaved(id){
   clearTimeout(el._t);
   el._t = setTimeout(()=>el.classList.remove('show'), 2000);
 }
-document.getElementById('saveBtn').addEventListener('click', ()=>{
+function saveCurrentCosts(){
   if(manualVC!=null) localStorage.setItem(LS_KEYS.vc, manualVC); else localStorage.removeItem(LS_KEYS.vc);
   if(manualFC!=null) localStorage.setItem(LS_KEYS.fc, manualFC); else localStorage.removeItem(LS_KEYS.fc);
+}
+function saveForecastCosts(){
+  if(manualVCF!=null) localStorage.setItem(LS_KEYS.vcF, manualVCF); else localStorage.removeItem(LS_KEYS.vcF);
+  if(manualFCF!=null) localStorage.setItem(LS_KEYS.fcF, manualFCF); else localStorage.removeItem(LS_KEYS.fcF);
+}
+document.getElementById('saveBtn').addEventListener('click', ()=>{
+  saveCurrentCosts();
   flashSaved('saveStatus');
 });
 document.getElementById('saveBtnF').addEventListener('click', ()=>{
-  if(manualVCF!=null) localStorage.setItem(LS_KEYS.vcF, manualVCF); else localStorage.removeItem(LS_KEYS.vcF);
-  if(manualFCF!=null) localStorage.setItem(LS_KEYS.fcF, manualFCF); else localStorage.removeItem(LS_KEYS.fcF);
+  saveForecastCosts();
+  saveCurrentCosts(); // 예상마감 저장 시, 방금 일할 계산되어 채워진 현재기준 값도 함께 저장합니다.
   flashSaved('saveStatusF');
+  flashSaved('saveStatus');
 });
+
 
 let monthChart;
 function renderMonthChart(){
@@ -893,117 +903,110 @@ function renderTopMonthToggle(){
 }
 
 function escapeHtml(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-function noteKey(week){ return `ggumbi_note_${selectedMonth}_${week}`; }
-function loadNote(week){
+const NOTE_SLOTS = [1,2,3,4,5];
+function noteKey(week, slot){ return `ggumbi_note_${selectedMonth}_${week}_slot${slot}`; }
+function loadNote(week, slot){
   try {
-    const raw = localStorage.getItem(noteKey(week));
+    const raw = localStorage.getItem(noteKey(week, slot));
     return raw ? JSON.parse(raw) : {title:'', content:'', image:null};
   } catch(e){ return {title:'', content:'', image:null}; }
 }
-function saveNote(week, title, content, image){
+function saveNote(week, slot, title, content, image){
   try {
-    localStorage.setItem(noteKey(week), JSON.stringify({title, content, image}));
+    localStorage.setItem(noteKey(week, slot), JSON.stringify({title, content, image}));
   } catch(e){
     // 이미지가 너무 커서 저장 용량을 초과한 경우, 이미지 없이 텍스트만이라도 저장
-    try { localStorage.setItem(noteKey(week), JSON.stringify({title, content, image:null})); alert('이미지 용량이 너무 커서 이미지는 저장하지 못했어요. 더 작은 이미지로 다시 시도해주세요.'); }
+    try { localStorage.setItem(noteKey(week, slot), JSON.stringify({title, content, image:null})); alert('이미지 용량이 너무 커서 이미지는 저장하지 못했어요. 더 작은 이미지로 다시 시도해주세요.'); }
     catch(e2){}
   }
 }
-let pendingImages = {}; // week -> base64 (저장 전 미리보기용, 패널별 독립)
-let weekNoteExpandedMap = {}; // week -> boolean
-
-function weekIdx(week){ return weeks.findIndex(w=>w.week===week) + 1; } // 1~5
+let pendingImages = {}; // slot -> base64 (저장 전 미리보기용, 현재 보이는 주차 기준)
 
 function renderWeekNoteList(){
   const list = document.getElementById('weekNoteList');
-  list.innerHTML = weeks.map(w=>{
-    const i = weekIdx(w.week);
-    return `
-    <div class="card week-note-item" id="weekNoteItem${i}">
-      <div class="week-note-header" data-week="${w.week}">
-        <button class="week-note-arrow collapsed" id="weekNoteArrow${i}">▼</button>
-        <span class="week-note-week-label">${w.week}</span>
-        <div class="week-note-title-display" id="weekNoteTitleDisplay${i}">제목 없음</div>
-        <span class="pl-save-status" id="weekNoteSaveStatus${i}"></span>
+  const sectionNote = document.getElementById('weekNoteSectionNote');
+  pendingImages = {};
+  if(!selectedWeek){
+    sectionNote.textContent = '위 "7월 주차별 비교"에서 주차를 선택하면 그 주차의 메모 5개가 나옵니다';
+    list.innerHTML = `<div class="card" style="color:var(--muted);font-size:13px;">1~5주차 중 하나를 선택해주세요. (대시보드 수치와 별개로 자유롭게 쓰는 정성적 보고 내용입니다)</div>`;
+    return;
+  }
+  const w = weeks.find(x=>x.week===selectedWeek);
+  sectionNote.textContent = `${selectedWeek} · ${w.start}~${w.end} 의 메모 5개`;
+  list.innerHTML = NOTE_SLOTS.map(slot=>`
+    <div class="card week-note-item" id="weekNoteItem${slot}">
+      <div class="week-note-header" data-slot="${slot}">
+        <button class="week-note-arrow collapsed" id="weekNoteArrow${slot}">▼</button>
+        <span class="week-note-week-label">메모 ${slot}</span>
+        <div class="week-note-title-display" id="weekNoteTitleDisplay${slot}">제목 없음</div>
+        <span class="pl-save-status" id="weekNoteSaveStatus${slot}"></span>
       </div>
-      <div id="weekNoteBodyWrap${i}" style="display:none;padding:0 22px 22px;">
-        <div id="weekNoteBody${i}"></div>
+      <div id="weekNoteBodyWrap${slot}" style="display:none;padding:0 22px 22px;">
+        <div id="weekNoteBody${slot}"></div>
       </div>
-    </div>`;
-  }).join('');
+    </div>`).join('');
 
-  weeks.forEach(w=>{
-    const i = weekIdx(w.week);
-    document.querySelector(`#weekNoteItem${i} .week-note-header`).addEventListener('click', ()=>{
-      toggleWeekNote(w.week);
+  NOTE_SLOTS.forEach(slot=>{
+    document.querySelector(`#weekNoteItem${slot} .week-note-header`).addEventListener('click', ()=>{
+      toggleWeekNote(slot);
     });
-    fillWeekNoteBody(w.week);
+    fillWeekNoteBody(slot);
   });
 }
 
-function fillWeekNoteBody(week){
-  const i = weekIdx(week);
-  const note = loadNote(week);
-  pendingImages[week] = note.image || null;
-  document.getElementById(`weekNoteTitleDisplay${i}`).textContent = note.title || '제목 없음';
-  const body = document.getElementById(`weekNoteBody${i}`);
-  const w = weeks.find(x=>x.week===week);
+function fillWeekNoteBody(slot){
+  const week = selectedWeek;
+  const note = loadNote(week, slot);
+  pendingImages[slot] = note.image || null;
+  document.getElementById(`weekNoteTitleDisplay${slot}`).textContent = note.title || '제목 없음';
+  const body = document.getElementById(`weekNoteBody${slot}`);
   body.innerHTML = `
-    <div style="font-size:11.5px;color:var(--muted);margin-bottom:10px;">${week} · ${w.start}~${w.end}</div>
-    <input type="text" id="weekNoteTitle${i}" class="week-note-title" placeholder="제목을 입력하세요 (예: 분석 메모, 이슈사항 등)" value="${escapeHtml(note.title)}">
-    <textarea id="weekNoteContent${i}" class="week-note-content" placeholder="이번 주 보고 내용을 자유롭게 작성하세요 (프로모션, 이슈, 특이사항 등)">${escapeHtml(note.content)}</textarea>
+    <input type="text" id="weekNoteTitle${slot}" class="week-note-title" placeholder="제목을 입력하세요 (예: 분석 메모, 이슈사항 등)" value="${escapeHtml(note.title)}">
+    <textarea id="weekNoteContent${slot}" class="week-note-content" placeholder="자유롭게 작성하세요 (프로모션, 이슈, 특이사항 등)">${escapeHtml(note.content)}</textarea>
     <div class="week-note-image-row">
-      <button class="week-note-image-btn" id="weekNoteImageBtn${i}">🖼 이미지 추가</button>
-      <input type="file" accept="image/*" id="weekNoteImageInput${i}" style="display:none">
+      <button class="week-note-image-btn" id="weekNoteImageBtn${slot}">🖼 이미지 추가</button>
+      <input type="file" accept="image/*" id="weekNoteImageInput${slot}" style="display:none">
     </div>
-    <div id="weekNoteImagePreviewWrap${i}"></div>
-    <div class="pl-save-row" style="margin-top:14px;"><button class="pl-save-btn" id="weekNoteSaveBtn${i}">저장</button></div>
+    <div id="weekNoteImagePreviewWrap${slot}"></div>
+    <div class="pl-save-row" style="margin-top:14px;"><button class="pl-save-btn" id="weekNoteSaveBtn${slot}">저장</button></div>
   `;
-  renderImagePreview(week);
+  renderImagePreview(slot);
 
-  document.getElementById(`weekNoteImageBtn${i}`).addEventListener('click', ()=>{
-    document.getElementById(`weekNoteImageInput${i}`).click();
+  document.getElementById(`weekNoteImageBtn${slot}`).addEventListener('click', ()=>{
+    document.getElementById(`weekNoteImageInput${slot}`).click();
   });
-  document.getElementById(`weekNoteImageInput${i}`).addEventListener('change', (e)=>{
+  document.getElementById(`weekNoteImageInput${slot}`).addEventListener('change', (e)=>{
     const file = e.target.files && e.target.files[0];
     if(!file) return;
     const reader = new FileReader();
-    reader.onload = ()=>{ pendingImages[week] = reader.result; renderImagePreview(week); };
+    reader.onload = ()=>{ pendingImages[slot] = reader.result; renderImagePreview(slot); };
     reader.readAsDataURL(file);
   });
-  document.getElementById(`weekNoteSaveBtn${i}`).addEventListener('click', ()=>{
-    const title = document.getElementById(`weekNoteTitle${i}`).value;
-    const content = document.getElementById(`weekNoteContent${i}`).value;
-    saveNote(week, title, content, pendingImages[week]);
-    document.getElementById(`weekNoteTitleDisplay${i}`).textContent = title || '제목 없음';
-    flashSaved(`weekNoteSaveStatus${i}`);
+  document.getElementById(`weekNoteSaveBtn${slot}`).addEventListener('click', ()=>{
+    const title = document.getElementById(`weekNoteTitle${slot}`).value;
+    const content = document.getElementById(`weekNoteContent${slot}`).value;
+    saveNote(week, slot, title, content, pendingImages[slot]);
+    document.getElementById(`weekNoteTitleDisplay${slot}`).textContent = title || '제목 없음';
+    flashSaved(`weekNoteSaveStatus${slot}`);
   });
 }
 
-function renderImagePreview(week){
-  const i = weekIdx(week);
-  const wrap = document.getElementById(`weekNoteImagePreviewWrap${i}`);
+function renderImagePreview(slot){
+  const wrap = document.getElementById(`weekNoteImagePreviewWrap${slot}`);
   if(!wrap) return;
-  const img = pendingImages[week];
+  const img = pendingImages[slot];
   if(!img){ wrap.innerHTML = ''; return; }
-  wrap.innerHTML = `<div class="week-note-image-preview"><img src="${img}"><button class="week-note-image-remove" id="weekNoteImageRemove${i}">✕</button></div>`;
-  document.getElementById(`weekNoteImageRemove${i}`).addEventListener('click', ()=>{ pendingImages[week] = null; renderImagePreview(week); });
+  wrap.innerHTML = `<div class="week-note-image-preview"><img src="${img}"><button class="week-note-image-remove" id="weekNoteImageRemove${slot}">✕</button></div>`;
+  document.getElementById(`weekNoteImageRemove${slot}`).addEventListener('click', ()=>{ pendingImages[slot] = null; renderImagePreview(slot); });
 }
 
-function toggleWeekNote(week, forceOpen){
-  const i = weekIdx(week);
-  const cur = !!weekNoteExpandedMap[week];
+function toggleWeekNote(slot, forceOpen){
+  const arrow = document.getElementById(`weekNoteArrow${slot}`);
+  const wrap = document.getElementById(`weekNoteBodyWrap${slot}`);
+  const cur = !arrow.classList.contains('collapsed');
   const next = forceOpen===undefined ? !cur : forceOpen;
-  weekNoteExpandedMap[week] = next;
-  document.getElementById(`weekNoteArrow${i}`).classList.toggle('collapsed', !next);
-  document.getElementById(`weekNoteBodyWrap${i}`).style.display = next ? 'block' : 'none';
-}
-
-// 위 "7월 주차별 비교"에서 주차 탭을 누르면, 그 주차에 해당하는 메모 패널을 자동으로 펼쳐줍니다.
-function syncWeekNoteWithSelectedWeek(){
-  if(!selectedWeek) return;
-  weeks.forEach(w=>{ if(w.week!==selectedWeek && weekNoteExpandedMap[w.week]) toggleWeekNote(w.week, false); });
-  toggleWeekNote(selectedWeek, true);
+  arrow.classList.toggle('collapsed', !next);
+  wrap.style.display = next ? 'block' : 'none';
 }
 
 
@@ -1021,7 +1024,7 @@ function renderAll(){
     renderDaily();
     renderCustomers();
     renderItems();
-    syncWeekNoteWithSelectedWeek();
+    renderWeekNoteList();
   }
 }
 
@@ -1030,7 +1033,6 @@ function renderAll(){
     await loadAll();
     loadSavedCosts();
     renderTopMonthToggle();
-    renderWeekNoteList();
     renderMonthChart();
     renderAll();
     document.getElementById('footerNote').textContent = '데이터 출처: 거래명세서품목조회(원본)(매출)·정리(원가, 7월 블록 W열)·202606(판매)ERP(목표) (GGUMBI F&B 원가관리 통합 데이터 시트), 26년 쿠팡 채널VS쿠팡 외 (F&B 마누스 로우데이터 시트) — 모두 구글시트에서 실시간 fetch';
