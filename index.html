@@ -212,7 +212,7 @@
 // ---- Sheet sources ----
 const MAIN_SHEET = '11k69kRVVp7f1C3CADD81ytG6weKpPRB1ON9FR-1_4eo';
 const GID_TRANSACTIONS = '1096885211';   // 거래명세서품목조회(원본)
-const GID_COST = '1259280377';           // 7월(진행중)
+const GID_JEONGLI = '147807231';         // 정리 (7월 블록 W열 원가단가 기준)
 const GID_TARGETS = '1882406292';        // 202606(판매)ERP
 
 const HIST_SHEET = '1qCA02HAl77VM-O7rGLMwpxkDFsj1uVpjEJEk4MTyOyQ';
@@ -313,12 +313,13 @@ async function fetchCSV(sheetId, gid){
 }
 
 async function loadAll(){
-  // 1) cost lookup from 7월(진행중)
-  const costRows = await fetchCSV(MAIN_SHEET, GID_COST);
+  // 1) cost lookup from 정리 시트의 7월 블록 W열(원가단가,당월)
+  const costRows = await fetchCSV(MAIN_SHEET, GID_JEONGLI);
   for(let r=1;r<costRows.length;r++){
     const row = costRows[r];
-    const code = row[1]; // B열 품번
-    const uc = numVal(row[16]); // Q열 원가단가
+    if(!row || row[4] !== '7월') continue; // E열 = 월
+    const code = row[6];     // G열 품번
+    const uc = numVal(row[22]); // W열 원가단가(당월)
     if(code) unitCost[code] = uc;
   }
 
@@ -774,7 +775,7 @@ function renderAll(){
     await loadAll();
     renderMonthChart();
     renderAll();
-    document.getElementById('footerNote').textContent = '데이터 출처: 거래명세서품목조회(원본)·7월(진행중)·202606(판매)ERP (GGUMBI F&B 원가관리 통합 데이터 시트), 26년 쿠팡 채널VS쿠팡 외 (F&B 마누스 로우데이터 시트) — 모두 구글시트에서 실시간 fetch';
+    document.getElementById('footerNote').textContent = '데이터 출처: 거래명세서품목조회(원본)(매출)·정리(원가, 7월 블록 W열)·202606(판매)ERP(목표) (GGUMBI F&B 원가관리 통합 데이터 시트), 26년 쿠팡 채널VS쿠팡 외 (F&B 마누스 로우데이터 시트) — 모두 구글시트에서 실시간 fetch';
     document.getElementById('loadingMsg').style.display='none';
     document.getElementById('mainContent').style.display='block';
   }catch(e){
