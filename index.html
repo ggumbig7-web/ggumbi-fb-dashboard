@@ -150,22 +150,16 @@
     <span class="month-toggle-note" id="topMonthNote"></span>
   </div>
 
-  <div class="section-title"><h2>7월 월간 목표 대비 실적</h2><span>VAT별도, 202606(판매)ERP 시트 실시간 연동</span></div>
+  <div class="section-title"><h2 id="titleMonthlyTarget">7월 월간 목표 대비 실적</h2><span>VAT별도, 판매목표 ERP 시트 실시간 연동</span></div>
   <div class="target-box" id="targetBox"></div>
 
-  <div class="section-title"><h2>7월 주간 목표 대비 실적</h2><span>VAT별도, 202606(판매)ERP 시트 실시간 연동</span></div>
+  <div class="section-title"><h2 id="titleWeeklyTarget">7월 주간 목표 대비 실적</h2><span>VAT별도, 판매목표 ERP 시트 실시간 연동</span></div>
   <div class="controls" style="justify-content:flex-end;margin-bottom:6px;">
-    <div class="chan-toggle" id="weekTargetToggle">
-      <button data-wk="1주차" class="active">1주</button>
-      <button data-wk="2주차">2주</button>
-      <button data-wk="3주차">3주</button>
-      <button data-wk="4주차">4주</button>
-      <button data-wk="5주차">5주</button>
-    </div>
+    <div class="chan-toggle" id="weekTargetToggle"></div>
   </div>
   <div class="target-box" id="weekTargetBox"></div>
 
-  <div class="section-title"><h2>채널별 · 주차별 매출 실적</h2><span>목표: 202606(판매)ERP 시트 · 실적/매출이익: 거래명세서+원가단가 실시간 계산</span></div>
+  <div class="section-title"><h2>채널별 · 주차별 매출 실적</h2><span>목표: 판매목표 ERP 시트 · 실적/매출이익: 거래명세서+원가단가 실시간 계산</span></div>
   <div class="card">
     <div class="table-scroll-x">
       <table class="chan-week-table" id="chanWeekTable"></table>
@@ -221,7 +215,7 @@
       </div>
     </div>
 
-    <div class="section-title"><h2>품목별 수익성</h2><span>7월 누계</span></div>
+    <div class="section-title"><h2>품목별 수익성</h2><span id="itemPeriodLabel">7월 누계</span></div>
     <div class="card">
       <div class="controls">
         <input class="search" id="itemSearch" placeholder="품목명 검색...">
@@ -231,7 +225,7 @@
       </div>
     </div>
 
-    <div class="section-title"><h2>7월 주차별 비교</h2><span id="weekRangeLabel"></span></div>
+    <div class="section-title"><h2 id="titleWeeklyCompare">7월 주차별 비교</h2><span id="weekRangeLabel"></span></div>
     <div class="week-tabs" id="weekTabs"></div>
     <div class="card">
       <div class="controls" style="justify-content:flex-end;margin-bottom:6px;">
@@ -257,9 +251,7 @@
 if(window.ChartDataLabels){ Chart.register(ChartDataLabels); Chart.defaults.set('plugins.datalabels', {display:false}); }
 
 const MAIN_SHEET = '11k69kRVVp7f1C3CADD81ytG6weKpPRB1ON9FR-1_4eo';
-const GID_TRANSACTIONS = '1096885211';   // 거래명세서품목조회(원본)
-const GID_JEONGLI = '147807231';         // 정리 (7월 블록 W열 원가단가 기준)
-const GID_TARGETS = '46932363';          // 202606(판매)ERP
+const GID_JEONGLI = '147807231';         // 정리 (모든 월의 W열 원가단가 기준)
 
 const HIST_SHEET = '1qCA02HAl77VM-O7rGLMwpxkDFsj1uVpjEJEk4MTyOyQ';
 const GID_HIST = '0';                    // 26년 쿠팡 채널VS쿠팡 외
@@ -300,25 +292,62 @@ function fmtM(n){ return (n/1_000_000).toLocaleString('ko-KR',{maximumFractionDi
 function fmtNum(n){ return Math.round(n).toLocaleString('ko-KR'); }
 function fmtPct(n){ return isFinite(n) ? (n*100).toFixed(1)+'%' : '-'; }
 
-const weeks = [
-  {week:'1주차', start:'2026-07-01', end:'2026-07-05'},
-  {week:'2주차', start:'2026-07-06', end:'2026-07-12'},
-  {week:'3주차', start:'2026-07-13', end:'2026-07-19'},
-  {week:'4주차', start:'2026-07-20', end:'2026-07-26'},
-  {week:'5주차', start:'2026-07-27', end:'2026-07-31'},
-];
+// 월별 설정 — 새 달 데이터가 들어오면 여기에 항목 하나만 추가하면 됩니다.
+// txMap의 인덱스는 해당 월 거래명세서(raw) 시트의 0-based 열 번호입니다 (월마다 원본 열 배치가 다를 수 있어요).
+const MONTH_CONFIGS = {
+  '2026-05': {
+    label:'5월', jeongliMonth:'5월', daysInMonth:31,
+    targetGid:'1107573904', txGid:'10662366', txStartRow:1,
+    txMap:{date:4, customer:10, code:21, name:20, qty:25, sales:30},
+    weeks:[
+      {week:'1주차', start:'2026-05-01', end:'2026-05-10', planCol:'AX', actualCol:'AY'},
+      {week:'2주차', start:'2026-05-11', end:'2026-05-17', planCol:'BB', actualCol:'BC'},
+      {week:'3주차', start:'2026-05-18', end:'2026-05-24', planCol:'BF', actualCol:'BG'},
+      {week:'4주차', start:'2026-05-25', end:'2026-05-31', planCol:'BJ', actualCol:'BK'},
+    ],
+    monthlyPlanCol:'BR', monthlyActualCol:'BS',
+  },
+  '2026-06': {
+    label:'6월', jeongliMonth:'6월', daysInMonth:30,
+    targetGid:'1233165628', txGid:'677281837', txStartRow:1,
+    txMap:{date:4, customer:10, code:21, name:20, qty:25, sales:30},
+    weeks:[
+      {week:'1주차', start:'2026-06-01', end:'2026-06-07', planCol:'AY', actualCol:'AZ'},
+      {week:'2주차', start:'2026-06-08', end:'2026-06-14', planCol:'BC', actualCol:'BD'},
+      {week:'3주차', start:'2026-06-15', end:'2026-06-21', planCol:'BG', actualCol:'BH'},
+      {week:'4주차', start:'2026-06-22', end:'2026-06-30', planCol:'BK', actualCol:'BL'},
+    ],
+    monthlyPlanCol:'BS', monthlyActualCol:'BT',
+  },
+  '2026-07': {
+    label:'7월', jeongliMonth:'7월', daysInMonth:31,
+    targetGid:'69590838', txGid:'1096885211', txStartRow:3,
+    txMap:{date:4, customer:8, code:12, name:11, qty:16, sales:21},
+    weeks:[
+      {week:'1주차', start:'2026-07-01', end:'2026-07-05', planCol:'AZ', actualCol:'BA'},
+      {week:'2주차', start:'2026-07-06', end:'2026-07-12', planCol:'BD', actualCol:'BE'},
+      {week:'3주차', start:'2026-07-13', end:'2026-07-19', planCol:'BH', actualCol:'BI'},
+      {week:'4주차', start:'2026-07-20', end:'2026-07-26', planCol:'BL', actualCol:'BM'},
+      {week:'5주차', start:'2026-07-27', end:'2026-07-31', planCol:'BP', actualCol:'BQ'},
+    ],
+    monthlyPlanCol:'BT', monthlyActualCol:'BU',
+  },
+};
+
 const custColors = ['#3D9A9A','#D97706','#6BBDBD','#B85450','#8B6914','#A3D3D2','#3D5A99','#8B6BA6'];
+const HAS_DETAIL = new Set(['2026-05','2026-06','2026-07']); // 일별 상세 데이터가 있는 달
 
 let selectedMonth = '2026-07';
 let selectedWeek = null;
+let weeks = MONTH_CONFIGS[selectedMonth].weeks; // 현재 활성월의 주차 배열 (월 전환 시 재대입됨)
 let unitCost = {};        // 품번 -> 원가단가
 let txRows = [];          // {date, customer, code, name, qty, sales}
-let monthly = [];         // 1~7월 {month,is_actual,sales,cost}
+let monthly = [];         // 1~7월 {month,is_actual,sales,cost}  (트렌드 차트용, 활성월과 무관)
 let targets = {weeks:[], monthly:null};
-let gRowsGlobal = null;   // raw 202606(판매)ERP rows, for channel-week table
+let gRowsGlobal = null;   // raw 판매목표 ERP rows, for channel-week table
 
-// Row numbers below correspond exactly to 202606(판매)ERP sheet rows.
-// 'customer' matches the 거래처 name in 거래명세서품목조회(원본) I열 exactly.
+// Row numbers below correspond exactly to 판매목표 ERP 시트 rows (모든 월 공통 템플릿, 검증 완료).
+// 'customer' matches the 거래처 name in 각 월 거래명세서 원본의 거래처 컬럼과 정확히 일치.
 const CHANNEL_MAP = [
   {row:9,  customer:'쿠팡 주식회사', label:'Coupang (Direct)'},
   {row:11, customer:'스토어팜(G7)', label:'Naver Smart Store'},
@@ -358,34 +387,96 @@ async function fetchCSV(sheetId, gid){
   return parseCSV(text);
 }
 
-async function loadAll(){
-  // 1) cost lookup from 정리 시트의 7월 블록 W열(원가단가,당월)
+const monthCache = {}; // monthKey -> {unitCost, txRows, targets, gRowsGlobal}
+
+async function loadMonthData(monthKey){
+  if(monthCache[monthKey]) return monthCache[monthKey];
+  const cfg = MONTH_CONFIGS[monthKey];
+
+  // 1) cost lookup: 정리 시트에서 해당 월 블록의 W열(원가단가, 당월)
+  const localUnitCost = {};
   const costRows = await fetchCSV(MAIN_SHEET, GID_JEONGLI);
   for(let r=1;r<costRows.length;r++){
     const row = costRows[r];
-    if(!row || row[4] !== '7월') continue; // E열 = 월
-    const code = row[6];     // G열 품번
+    if(!row || row[4] !== cfg.jeongliMonth) continue; // E열 = 월
+    const code = row[6];        // G열 품번
     const uc = numVal(row[22]); // W열 원가단가(당월)
-    if(code) unitCost[code] = uc;
+    if(code) localUnitCost[code] = uc;
   }
 
-  // 2) transactions from 거래명세서품목조회(원본)
-  const tRows = await fetchCSV(MAIN_SHEET, GID_TRANSACTIONS);
-  for(let r=3;r<tRows.length;r++){ // data starts row4 (0-indexed row3)
+  // 2) transactions from 해당 월 거래명세서 원본
+  const localTxRows = [];
+  const tRows = await fetchCSV(MAIN_SHEET, cfg.txGid);
+  const tm = cfg.txMap;
+  for(let r=cfg.txStartRow;r<tRows.length;r++){
     const row = tRows[r];
-    if(!row || row.length<20) continue;
-    let d = row[4]; // E열 거래명세서일
-    const code = row[12]; // M열 품번
-    const name = row[11]; // L열 품명
-    const cust = row[8] || '미확인'; // I열 거래처
-    const qty = numVal(row[16]); // Q열
-    const sales = numVal(row[21]); // V열
+    if(!row || row.length < 15) continue;
+    let d = row[tm.date];
+    const code = row[tm.code];
+    const name = row[tm.name];
+    const cust = row[tm.customer] || '미확인';
+    const qty = numVal(row[tm.qty]);
+    const sales = numVal(row[tm.sales]);
     if(!code || !d) continue;
     d = d.slice(0,10);
-    txRows.push({date:d, customer:cust, code, name, qty, sales, cost: qty*(unitCost[code]||0)});
+    localTxRows.push({date:d, customer:cust, code, name, qty, sales, cost: qty*(localUnitCost[code]||0)});
   }
 
-  // 3) historical monthly (1~6월) from the manus source sheet
+  // 3) targets from 해당 월 판매목표 ERP
+  const gRows = await fetchCSV(MAIN_SHEET, cfg.targetGid);
+  function cell(r, colLetters){ const row = gRows[r-1]; return row ? numVal(row[colIdx(colLetters)]) : 0; }
+  const localTargets = {weeks:[], monthly:null};
+  cfg.weeks.forEach(w=>{
+    const coupangPlan = cell(9, w.planCol), coupangActual = cell(9, w.actualCol);
+    const onlinePlan = cell(10, w.planCol), onlineActual = cell(10, w.actualCol);
+    const totalPlan = cell(44, w.planCol), totalActual = cell(44, w.actualCol);
+    localTargets.weeks.push({
+      week: w.week,
+      total:{plan:totalPlan, actual:totalActual, rate: totalPlan? totalActual/totalPlan : 0},
+      online:{plan:onlinePlan, actual:onlineActual, rate: onlinePlan? onlineActual/onlinePlan : 0},
+      coupang:{plan:coupangPlan, actual:coupangActual, rate: coupangPlan? coupangActual/coupangPlan : 0},
+    });
+  });
+  localTargets.monthly = {
+    total:{plan:cell(44,cfg.monthlyPlanCol), actual:cell(44,cfg.monthlyActualCol), rate: cell(44,cfg.monthlyPlanCol)? cell(44,cfg.monthlyActualCol)/cell(44,cfg.monthlyPlanCol) : 0},
+    online:{plan:cell(10,cfg.monthlyPlanCol), actual:cell(10,cfg.monthlyActualCol), rate: cell(10,cfg.monthlyPlanCol)? cell(10,cfg.monthlyActualCol)/cell(10,cfg.monthlyPlanCol) : 0},
+    coupang:{plan:cell(9,cfg.monthlyPlanCol), actual:cell(9,cfg.monthlyActualCol), rate: cell(9,cfg.monthlyPlanCol)? cell(9,cfg.monthlyActualCol)/cell(9,cfg.monthlyPlanCol) : 0},
+  };
+
+  monthCache[monthKey] = {unitCost:localUnitCost, txRows:localTxRows, targets:localTargets, gRowsGlobal:gRows};
+  return monthCache[monthKey];
+}
+
+function activateMonthData(monthKey){
+  const data = monthCache[monthKey];
+  unitCost = data.unitCost;
+  txRows = data.txRows;
+  targets = data.targets;
+  gRowsGlobal = data.gRowsGlobal;
+  weeks = MONTH_CONFIGS[monthKey].weeks;
+  selectedMonth = monthKey;
+  selectedWeek = null;
+  if(!weeks.find(w=>w.week===selectedWeekTarget)) selectedWeekTarget = weeks[0].week;
+}
+
+async function switchToMonth(monthKey){
+  if(!monthCache[monthKey]) await loadMonthData(monthKey);
+  activateMonthData(monthKey);
+  applyMonthLabels();
+  renderAll();
+}
+
+function applyMonthLabels(){
+  const label = MONTH_CONFIGS[selectedMonth].label;
+  const set = (id, text)=>{ const el=document.getElementById(id); if(el) el.textContent = text; };
+  set('titleMonthlyTarget', `${label} 월간 목표 대비 실적`);
+  set('titleWeeklyTarget', `${label} 주간 목표 대비 실적`);
+  set('titleWeeklyCompare', `${label} 주차별 비교`);
+  set('itemPeriodLabel', `${label} 누계`);
+}
+
+async function loadAll(){
+  // 1~4월은 상세 데이터가 없어 기존 히스토리 시트의 월간 합계만 사용합니다.
   const hRows = await fetchCSV(HIST_SHEET, GID_HIST);
   const histByMonth = {};
   for(let r=2;r<hRows.length;r++){
@@ -395,44 +486,29 @@ async function loadAll(){
     const m = ym.match(/(\d{4})년\s*(\d{1,2})월/);
     if(!m) continue;
     const key = `${m[1]}-${String(m[2]).padStart(2,'0')}`;
-    if(key < '2026-01' || key > '2026-06') continue;
+    if(key < '2026-01' || key > '2026-04') continue;
     const sales = numVal(row[5]);  // F열 매출액(전체)
     const cost = numVal(row[7]);   // H열 매출원가(전체)
     if(!histByMonth[key]) histByMonth[key] = {sales:0, cost:0};
     histByMonth[key].sales += sales;
     histByMonth[key].cost += cost;
   }
-  for(let m=1;m<=6;m++){
+  for(let m=1;m<=4;m++){
     const key = `2026-${String(m).padStart(2,'0')}`;
     const d = histByMonth[key] || {sales:0,cost:0};
     monthly.push({month:key, is_actual:true, sales:d.sales, cost:d.cost});
   }
-  const julySales = txRows.reduce((a,r)=>a+r.sales,0);
-  const julyCost = txRows.reduce((a,r)=>a+r.cost,0);
-  monthly.push({month:'2026-07', is_actual:false, sales:julySales, cost:julyCost});
 
-  // 4) targets from 202606(판매)ERP fixed layout
-  const gRows = await fetchCSV(MAIN_SHEET, GID_TARGETS);
-  gRowsGlobal = gRows;
-  function cell(r, colLetters){ const row = gRows[r-1]; return row ? numVal(row[colIdx(colLetters)]) : 0; }
-  const weekCols = [['AZ','BA'],['BD','BE'],['BH','BI'],['BL','BM'],['BP','BQ']];
-  weeks.forEach((w,i)=>{
-    const [planCol, actualCol] = weekCols[i];
-    const coupangPlan = cell(9, planCol), coupangActual = cell(9, actualCol);
-    const onlinePlan = cell(10, planCol), onlineActual = cell(10, actualCol);
-    const totalPlan = cell(44, planCol), totalActual = cell(44, actualCol);
-    targets.weeks.push({
-      week: w.week,
-      total:{plan:totalPlan, actual:totalActual, rate: totalPlan? totalActual/totalPlan : 0},
-      online:{plan:onlinePlan, actual:onlineActual, rate: onlinePlan? onlineActual/onlinePlan : 0},
-      coupang:{plan:coupangPlan, actual:coupangActual, rate: coupangPlan? coupangActual/coupangPlan : 0},
-    });
-  });
-  targets.monthly = {
-    total:{plan:cell(44,'BT'), actual:cell(44,'BU'), rate: cell(44,'BT')? cell(44,'BU')/cell(44,'BT') : 0},
-    online:{plan:cell(10,'BT'), actual:cell(10,'BU'), rate: cell(10,'BT')? cell(10,'BU')/cell(10,'BT') : 0},
-    coupang:{plan:cell(9,'BT'), actual:cell(9,'BU'), rate: cell(9,'BT')? cell(9,'BU')/cell(9,'BT') : 0},
-  };
+  // 5,6,7월은 이제 각 월 거래명세서+정리 원가 기준으로 정확히 집계합니다.
+  for(const key of ['2026-05','2026-06','2026-07']){
+    await loadMonthData(key);
+    const rows = monthCache[key].txRows;
+    const sales = rows.reduce((a,r)=>a+r.sales,0);
+    const cost = rows.reduce((a,r)=>a+r.cost,0);
+    monthly.push({month:key, is_actual: key!=='2026-07', sales, cost});
+  }
+
+  activateMonthData(selectedMonth);
 }
 
 // ---------- rendering ----------
@@ -478,18 +554,20 @@ function getPeriodDays(){
 function renderKPI(){
   const grid = document.getElementById('kpiGrid');
   let sales, cost, label;
-  if(selectedMonth === '2026-07'){
-    const dlist = julyPeriodDays(); // always full 7/1~31, independent of the week-tab selector used elsewhere
+  if(HAS_DETAIL.has(selectedMonth)){
+    const dlist = julyPeriodDays(); // 선택된 달의 1일~말일 전체, 주차 탭 선택과 무관
     sales = dlist.reduce((a,d)=>a+d.sales,0);
     cost = dlist.reduce((a,d)=>a+d.cost,0);
-    label = '7월 누계';
+    label = MONTH_CONFIGS[selectedMonth].label + ' 누계';
   } else {
     const m = getMonthRow(selectedMonth);
     sales = m.sales; cost = m.cost;
     label = selectedMonth + ' 확정';
   }
   const margin = sales - cost;
-  document.getElementById('currentAsOfLabel').textContent = `${label} (2026-07-01~31 실적)`;
+  const cfg = MONTH_CONFIGS[selectedMonth];
+  const rangeText = cfg ? `${cfg.weeks[0].start}~${cfg.weeks[cfg.weeks.length-1].end}` : selectedMonth;
+  document.getElementById('currentAsOfLabel').textContent = `${label} (${rangeText} 실적)`;
   grid.innerHTML = `
     <div class="kpi-card"><div class="k">매출</div><div class="v">${fmtM(sales)}백만</div><div class="sub">${fmtWon(sales)}</div></div>
     <div class="kpi-card"><div class="k">매출원가</div><div class="v">${fmtM(cost)}백만</div><div class="sub">${fmtWon(cost)}</div></div>
@@ -498,16 +576,17 @@ function renderKPI(){
   `;
 }
 
-const DAYS_IN_JULY = 31;
+function daysInSelectedMonth(){ return (MONTH_CONFIGS[selectedMonth] && MONTH_CONFIGS[selectedMonth].daysInMonth) || 31; }
 function getForecastFigures(){
   const dlist = julyPeriodDays();
   const daysWithData = dlist.length; // whole-dataset date range
+  const totalDays = daysInSelectedMonth();
 
-  // If the month is already fully covered (all 31 days present in the data),
+  // If the month is already fully covered (all days present in the data),
   // there's nothing left to project — use the actual totals as-is instead of
   // extrapolating, since per-item active-day scaling would otherwise inflate
   // items that simply weren't sold every single day.
-  if(daysWithData >= DAYS_IN_JULY){
+  if(daysWithData >= totalDays){
     const sales = dlist.reduce((a,d)=>a+d.sales,0);
     const cost = dlist.reduce((a,d)=>a+d.cost,0);
     return { sales, cost, daysWithData, isComplete:true };
@@ -528,7 +607,7 @@ function getForecastFigures(){
   let sales = 0, cost = 0;
   Object.entries(byItem).forEach(([code, it])=>{
     const activeDays = it.days.size || 1;
-    const qtyFactor = DAYS_IN_JULY/activeDays;
+    const qtyFactor = totalDays/activeDays;
     const projectedQty = it.qty * qtyFactor;
     const avgPrice = it.qty ? it.sales/it.qty : 0;
     const unitCostVal = unitCost[code] || 0;
@@ -542,22 +621,23 @@ function renderKPIForecast(){
   const grid = document.getElementById('kpiGridForecast');
   const { sales, cost, daysWithData, isComplete } = getForecastFigures();
   const margin = sales - cost;
+  const label = MONTH_CONFIGS[selectedMonth] ? MONTH_CONFIGS[selectedMonth].label : selectedMonth;
   document.getElementById('forecastAsOfLabel').textContent = isComplete
-    ? `7월 전체(${daysWithData}일치) 데이터가 이미 다 들어와 있어 예측 없이 실적 그대로 표시 중`
-    : `품목별 판매 수량을 각 품목의 실제 판매일수 기준으로 31일까지 환산 → 품목 원가단가 재적용 (전체 실적 ${daysWithData}일치)`;
+    ? `${label} 전체(${daysWithData}일치) 데이터가 이미 다 들어와 있어 예측 없이 실적 그대로 표시 중`
+    : `품목별 판매 수량을 각 품목의 실제 판매일수 기준으로 ${daysInSelectedMonth()}일까지 환산 → 품목 원가단가 재적용 (전체 실적 ${daysWithData}일치)`;
   grid.innerHTML = `
     <div class="kpi-card"><div class="k">매출</div><div class="v">${fmtM(sales)}백만</div><div class="sub">${fmtWon(sales)}</div></div>
     <div class="kpi-card"><div class="k">매출원가</div><div class="v">${fmtM(cost)}백만</div><div class="sub">${fmtWon(cost)}</div></div>
     <div class="kpi-card"><div class="k">매출총이익</div><div class="v">${fmtM(margin)}백만</div><div class="sub">${fmtWon(margin)}</div></div>
-    <div class="kpi-card"><div class="k">이익률</div><div class="v">${fmtPct(margin/sales)}</div><div class="sub">${isComplete?'7월 확정':'예상 마감'}</div></div>
+    <div class="kpi-card"><div class="k">이익률</div><div class="v">${fmtPct(margin/sales)}</div><div class="sub">${isComplete?label+' 확정':'예상 마감'}</div></div>
   `;
 }
 
 let manualVC=null, manualFC=null;
 function renderProfitCalc(){
   let sales, cost;
-  if(selectedMonth==='2026-07'){
-    const dlist = julyPeriodDays(); // full 7/1~31, independent of the week-tab selector
+  if(HAS_DETAIL.has(selectedMonth)){
+    const dlist = julyPeriodDays();
     sales = dlist.reduce((a,d)=>a+d.sales,0);
     cost = dlist.reduce((a,d)=>a+d.cost,0);
   } else {
@@ -607,7 +687,8 @@ function bindMoneyInput(id, setter, rerender){
 }
 function proRateFactor(){
   const currentDays = julyPeriodDays().length;
-  return DAYS_IN_JULY ? currentDays/DAYS_IN_JULY : 1;
+  const total = daysInSelectedMonth();
+  return total ? currentDays/total : 1;
 }
 function fillProRated(targetId, fullValue, setter, rerender){
   const el = document.getElementById(targetId);
@@ -691,6 +772,20 @@ function renderTargetBox(){
 }
 
 let selectedWeekTarget = '1주차';
+function renderWeekTargetToggle(){
+  const wrap = document.getElementById('weekTargetToggle');
+  wrap.innerHTML = weeks.map(w=>
+    `<button data-wk="${w.week}" class="${w.week===selectedWeekTarget?'active':''}">${w.week}</button>`
+  ).join('');
+  wrap.querySelectorAll('button').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      wrap.querySelectorAll('button').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      selectedWeekTarget = btn.dataset.wk;
+      renderWeekTargetBox();
+    });
+  });
+}
 function renderWeekTargetBox(){
   const box = document.getElementById('weekTargetBox');
   const t = targets.weeks.find(w=>w.week===selectedWeekTarget);
@@ -701,21 +796,14 @@ function renderWeekTargetBox(){
     ${targetLine('G7 온라인', t.online.plan, t.online.actual, t.online.rate, 'sub')}
     ${targetLine('G7 쿠팡', t.coupang.plan, t.coupang.actual, t.coupang.rate, 'sub')}`;
 }
-document.querySelectorAll('#weekTargetToggle button').forEach(btn=>{
-  btn.addEventListener('click', ()=>{
-    document.querySelectorAll('#weekTargetToggle button').forEach(b=>b.classList.remove('active'));
-    btn.classList.add('active');
-    selectedWeekTarget = btn.dataset.wk;
-    renderWeekTargetBox();
-  });
-});
 
 function renderWeekTabs(){
   const wrap = document.getElementById('weekTabs');
   wrap.innerHTML = '';
+  const monthLabel = MONTH_CONFIGS[selectedMonth] ? MONTH_CONFIGS[selectedMonth].label : selectedMonth;
   const allBtn = document.createElement('button');
   allBtn.className = 'week-tab' + (selectedWeek===null?' active':'');
-  allBtn.textContent = '전체(7월)';
+  allBtn.textContent = `전체(${monthLabel})`;
   allBtn.onclick = ()=>{ selectedWeek=null; renderAll(); };
   wrap.appendChild(allBtn);
   weeks.forEach(w=>{
@@ -725,7 +813,8 @@ function renderWeekTabs(){
     b.onclick = ()=>{ selectedWeek=w.week; renderAll(); };
     wrap.appendChild(b);
   });
-  document.getElementById('weekRangeLabel').textContent = selectedWeek ? (weeks.find(w=>w.week===selectedWeek).start+'~'+weeks.find(w=>w.week===selectedWeek).end) : '2026-07-01~31';
+  const fullRange = weeks.length ? `${weeks[0].start}~${weeks[weeks.length-1].end}` : '';
+  document.getElementById('weekRangeLabel').textContent = selectedWeek ? (weeks.find(w=>w.week===selectedWeek).start+'~'+weeks.find(w=>w.week===selectedWeek).end) : fullRange;
 }
 
 let dailyChart;
@@ -772,7 +861,7 @@ function renderCustomers(){
     });
   });
   const rows = Object.entries(agg).map(([c,v])=>({c,...v,margin:v.sales-v.cost,rate:v.sales?(v.sales-v.cost)/v.sales:0})).filter(r=>r.sales>0).sort((a,b)=>b.sales-a.sales);
-  document.getElementById('customerPeriodLabel').textContent = selectedWeek || '7월 누계';
+  document.getElementById('customerPeriodLabel').textContent = selectedWeek || (MONTH_CONFIGS[selectedMonth].label + ' 누계');
   const body = document.getElementById('customerBody');
   const totS=rows.reduce((a,r)=>a+r.sales,0), totC=rows.reduce((a,r)=>a+r.cost,0), totQ=rows.reduce((a,r)=>a+r.qty,0);
   body.innerHTML = rows.map((r,i)=>`<tr><td class="rank">${i+1}</td><td>${r.c}</td><td>${fmtNum(r.qty)}</td><td>${fmtWon(r.sales)}</td><td>${fmtPct(totS? r.sales/totS : 0)}</td><td>${fmtWon(r.cost)}</td><td>${fmtWon(r.margin)}</td><td class="${r.rate<0.2?'neg':'pos'}">${fmtPct(r.rate)}</td></tr>`).join('');
@@ -806,7 +895,7 @@ document.querySelectorAll('#dailyChanToggle button').forEach(btn=>{
 
 function computeChannelWeekData(){
   function cell(r, colLetters){ const row = gRowsGlobal[r-1]; return row ? numVal(row[colIdx(colLetters)]) : 0; }
-  const weekCols = [['AZ','BA'],['BD','BE'],['BH','BI'],['BL','BM'],['BP','BQ']];
+  const cfg = MONTH_CONFIGS[selectedMonth];
   const matchedCustomers = new Set(CHANNEL_MAP.filter(c=>c.customer).map(c=>c.customer));
 
   function actualCostFor(customer, start, end){
@@ -821,13 +910,13 @@ function computeChannelWeekData(){
   }
 
   return CHANNEL_MAP.map(ch=>{
-    const weeksData = weeks.map((w,i)=>{
-      const plan = cell(ch.row, weekCols[i][0]);
+    const weeksData = weeks.map((w)=>{
+      const plan = cell(ch.row, w.planCol);
       const {actual, cost} = actualCostFor(ch.customer, w.start, w.end);
       const margin = actual-cost;
       return {plan, actual, margin, rate: actual? margin/actual:0, progress: plan? actual/plan:0};
     });
-    const totalPlan = cell(ch.row, 'BT');
+    const totalPlan = cell(ch.row, cfg.monthlyPlanCol);
     const {actual: totalActual, cost: totalCost} = actualCostFor(ch.customer, null, null);
     const totalMargin = totalActual-totalCost;
     return {
@@ -841,12 +930,14 @@ function computeChannelWeekData(){
 function renderChanWeekTable(){
   const table = document.getElementById('chanWeekTable');
   const grpColors = ['#2A7D7B','#3D5A99','#2A7D7B','#3D5A99','#2A7D7B'];
+  const nWeeks = weeks.length;
   let grpRow = '<tr class="grp"><th class="chan-h"></th>';
-  weeks.forEach((w,i)=> grpRow += `<th colspan="5" style="background:${grpColors[i]}">${w.week} (${w.start.slice(5)}~${w.end.slice(5)})</th>`);
-  grpRow += `<th colspan="5" style="background:var(--amber)">TTL (7.1~7.31)</th></tr>`;
+  weeks.forEach((w,i)=> grpRow += `<th colspan="5" style="background:${grpColors[i%grpColors.length]}">${w.week} (${w.start.slice(5)}~${w.end.slice(5)})</th>`);
+  const fullRange = nWeeks ? `${weeks[0].start.slice(5)}~${weeks[nWeeks-1].end.slice(5)}` : '';
+  grpRow += `<th colspan="5" style="background:var(--amber)">TTL (${fullRange})</th></tr>`;
 
   let subRow = '<tr class="sub"><th class="chan-h">채널</th>';
-  for(let i=0;i<6;i++){ subRow += '<th>목표</th><th>실적</th><th>진척률</th><th>매출이익</th><th>이익률</th>'; }
+  for(let i=0;i<nWeeks+1;i++){ subRow += '<th>목표</th><th>실적</th><th>진척률</th><th>매출이익</th><th>이익률</th>'; }
   subRow += '</tr>';
 
   const data = computeChannelWeekData();
@@ -855,18 +946,18 @@ function renderChanWeekTable(){
   function cellsFor(w, groupIdx){
     const progCls = w.progress>=0.8?'wk-rate-good':(w.progress<0.4?'wk-rate-bad':'');
     const rateCls = w.rate<0.2?'wk-rate-bad':'wk-rate-good';
-    const bg = groupBg[groupIdx];
+    const bg = groupBg[groupIdx % groupBg.length];
     return `<td class="wk-plan">${fmtWon(w.plan)}</td><td style="background:${bg};font-weight:600;">${fmtWon(w.actual)}</td><td class="${progCls}">${fmtPct(w.progress)}</td><td>${fmtWon(w.margin)}</td><td class="${rateCls}">${fmtPct(w.rate)}</td>`;
   }
   data.forEach(ch=>{
     let row = `<tr><td>${ch.label}</td>`;
     ch.weeks.forEach((w,i)=>{ row += cellsFor(w, i); });
-    row += cellsFor(ch.total, 5);
+    row += cellsFor(ch.total, nWeeks);
     row += '</tr>';
     body += row;
   });
   // grand total row across all channels
-  const grand = { weeks: weeks.map((w,i)=>({plan:0,actual:0,margin:0})), total:{plan:0,actual:0,margin:0} };
+  const grand = { weeks: weeks.map(()=>({plan:0,actual:0,margin:0})), total:{plan:0,actual:0,margin:0} };
   data.forEach(ch=>{
     ch.weeks.forEach((w,i)=>{ grand.weeks[i].plan+=w.plan; grand.weeks[i].actual+=w.actual; grand.weeks[i].margin+=w.margin; });
     grand.total.plan+=ch.total.plan; grand.total.actual+=ch.total.actual; grand.total.margin+=ch.total.margin;
@@ -876,7 +967,7 @@ function renderChanWeekTable(){
   grand.total.progress = grand.total.plan? grand.total.actual/grand.total.plan:0;
   let totalRow = '<tr class="total-row"><td>합계</td>';
   grand.weeks.forEach((w,i)=>{ totalRow += cellsFor(w, i); });
-  totalRow += cellsFor(grand.total, 5) + '</tr>';
+  totalRow += cellsFor(grand.total, nWeeks) + '</tr>';
   body += totalRow;
 
   table.innerHTML = `<thead>${grpRow}${subRow}</thead><tbody>${body}</tbody>`;
@@ -884,22 +975,27 @@ function renderChanWeekTable(){
 
 // 월별 토글 설정 — 다음 달 데이터가 준비되면 이 배열에 항목만 추가하면 됩니다.
 const AVAILABLE_MONTHS = [
+  {key:'2026-05', label:'5월'},
+  {key:'2026-06', label:'6월'},
   {key:'2026-07', label:'7월'},
 ];
 function renderTopMonthToggle(){
   const wrap = document.getElementById('topMonthToggle');
   wrap.innerHTML = AVAILABLE_MONTHS.map(m=>
-    `<button data-month="${m.key}" class="${m.key==='2026-07'?'active':''}">${m.label}</button>`
+    `<button data-month="${m.key}" class="${m.key===selectedMonth?'active':''}">${m.label}</button>`
   ).join('');
   wrap.querySelectorAll('button').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
+    btn.addEventListener('click', async ()=>{
+      const monthKey = btn.dataset.month;
+      if(monthKey===selectedMonth) return;
       wrap.querySelectorAll('button').forEach(b=>b.classList.remove('active'));
       btn.classList.add('active');
-      // 지금은 7월 데이터만 있어서 다른 달을 눌러도 전환할 데이터가 없습니다.
-      // 다음 달 데이터가 들어오면 여기서 selectedMonth를 바꾸고 loadAll()을 다시 태우도록 연결하면 됩니다.
+      document.getElementById('topMonthNote').textContent = '불러오는 중...';
+      await switchToMonth(monthKey);
+      document.getElementById('topMonthNote').textContent = '';
     });
   });
-  document.getElementById('topMonthNote').textContent = '다음 달 데이터가 준비되면 이 자리에 새 달 버튼이 추가됩니다.';
+  document.getElementById('topMonthNote').textContent = '';
 }
 
 function escapeHtml(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -927,7 +1023,7 @@ function renderWeekNoteList(){
   const sectionNote = document.getElementById('weekNoteSectionNote');
   pendingImages = {};
   if(!selectedWeek){
-    sectionNote.textContent = '위 "7월 주차별 비교"에서 주차를 선택하면 그 주차의 메모 5개가 나옵니다';
+    sectionNote.textContent = '위 "주차별 비교"에서 주차를 선택하면 그 주차의 메모 5개가 나옵니다';
     list.innerHTML = `<div class="card" style="color:var(--muted);font-size:13px;">1~5주차 중 하나를 선택해주세요. (대시보드 수치와 별개로 자유롭게 쓰는 정성적 보고 내용입니다)</div>`;
     return;
   }
@@ -1012,14 +1108,15 @@ function toggleWeekNote(slot, forceOpen){
 
 function renderAll(){
   renderTargetBox();
+  renderWeekTargetToggle();
   renderWeekTargetBox();
   renderChanWeekTable();
   renderKPI();
   renderProfitCalc();
   renderKPIForecast();
   renderProfitCalcForecast();
-  document.getElementById('julySection').style.display = selectedMonth==='2026-07' ? 'block' : 'none';
-  if(selectedMonth==='2026-07'){
+  document.getElementById('julySection').style.display = HAS_DETAIL.has(selectedMonth) ? 'block' : 'none';
+  if(HAS_DETAIL.has(selectedMonth)){
     renderWeekTabs();
     renderDaily();
     renderCustomers();
@@ -1033,9 +1130,10 @@ function renderAll(){
     await loadAll();
     loadSavedCosts();
     renderTopMonthToggle();
+    applyMonthLabels();
     renderMonthChart();
     renderAll();
-    document.getElementById('footerNote').textContent = '데이터 출처: 거래명세서품목조회(원본)(매출)·정리(원가, 7월 블록 W열)·202606(판매)ERP(목표) (GGUMBI F&B 원가관리 통합 데이터 시트), 26년 쿠팡 채널VS쿠팡 외 (F&B 마누스 로우데이터 시트) — 모두 구글시트에서 실시간 fetch';
+    document.getElementById('footerNote').textContent = '데이터 출처: 각 월 거래명세서(매출)·정리(원가, 월별 블록 W열)·판매목표 ERP(목표) (GGUMBI F&B 원가관리 통합 데이터 시트), 26년 쿠팡 채널VS쿠팡 외 (F&B 마누스 로우데이터 시트) — 모두 구글시트에서 실시간 fetch';
     document.getElementById('loadingMsg').style.display='none';
     document.getElementById('mainContent').style.display='block';
   }catch(e){
