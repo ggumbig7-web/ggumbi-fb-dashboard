@@ -36,6 +36,20 @@
 
   .kpi-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:24px;}
   .kpi-card{background:var(--card);border-radius:10px;padding:18px;border-left:4px solid var(--teal);}
+  .top-kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px;}
+  .top-kpi-card{background:var(--card);border-radius:14px;padding:20px 22px;}
+  .top-kpi-card .tk-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;}
+  .top-kpi-card .tk-label{font-size:12.5px;color:var(--muted);font-weight:600;}
+  .top-kpi-card .tk-icon{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#fff;flex-shrink:0;}
+  .top-kpi-card .tk-value{font-size:25px;font-weight:800;color:var(--ink);margin-bottom:12px;letter-spacing:-.3px;}
+  .top-kpi-card .tk-sub{display:flex;justify-content:space-between;align-items:center;font-size:12.5px;color:var(--muted);margin-bottom:10px;gap:8px;}
+  .top-kpi-card .tk-badge{font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap;}
+  .top-kpi-card .tk-badge.pos{background:rgba(42,125,123,0.14);color:var(--teal);}
+  .top-kpi-card .tk-badge.neg{background:rgba(184,84,80,0.14);color:var(--rust);}
+  .top-kpi-card .tk-trend{font-size:11.5px;color:var(--muted);}
+  .top-kpi-card .tk-trend.pos{color:var(--teal);}
+  .top-kpi-card .tk-trend.neg{color:var(--rust);}
+  @media (max-width:900px){.top-kpi-grid{grid-template-columns:1fr 1fr;}}
   #kpiGridForecast .kpi-card{border-left-color:var(--amber);}
   .kpi-card .k{font-size:11.5px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em;}
   .kpi-card .v{font-family:-apple-system,'Apple SD Gothic Neo','Noto Sans KR',sans-serif;font-size:22px;font-weight:600;margin:8px 0 2px;}
@@ -144,6 +158,8 @@
 
   <div id="loadingMsg" class="loading">데이터를 불러오는 중입니다...</div>
   <div id="mainContent" style="display:none;">
+
+  <div class="top-kpi-grid" id="topKpiGrid"></div>
 
   <div class="month-toggle-row">
     <div class="chan-toggle" id="topMonthToggle"></div>
@@ -477,6 +493,7 @@ async function switchToMonth(monthKey){
   if(!monthCache[monthKey]) await loadMonthData(monthKey);
   activateMonthData(monthKey);
   applyMonthLabels();
+  loadSavedCosts();
   renderAll();
 }
 
@@ -528,6 +545,14 @@ async function loadAll(){
 
 // ---------- rendering ----------
 function getMonthRow(m){ return monthly.find(x=>x.month===m); }
+function prevMonthKey(monthKey){
+  const idx = AVAILABLE_MONTHS.findIndex(m=>m.key===monthKey);
+  return idx>0 ? AVAILABLE_MONTHS[idx-1].key : null;
+}
+function getSavedCostFor(monthKey, name){
+  const v = localStorage.getItem(`ggumbi_${name}_${monthKey}`);
+  return v!=null ? Number(v) : null;
+}
 
 function renderMonthTabs(){
   const wrap = document.getElementById('monthTabs');
@@ -564,6 +589,83 @@ function getPeriodDays(){
     return days.filter(d=> d.date>=w.start && d.date<=w.end);
   }
   return days;
+}
+
+function renderTopKpiRow(){
+  const grid = document.getElementById('topKpiGrid');
+  const cur = getMonthRow(selectedMonth) || {sales:0, cost:0};
+  const prevKey = prevMonthKey(selectedMonth);
+  const prev = prevKey ? getMonthRow(prevKey) : null;
+  const prevLabel = prevKey ? MONTH_CONFIGS[prevKey].label : null;
+
+  const sales = cur.sales, cost = cur.cost;
+  const gross = sales - cost, grossRate = sales? gross/sales : 0;
+  const vc = manualVC, fc = manualFC;
+  const cm = vc!=null ? gross - vc : null;
+  const cmRate = (cm!=null && sales) ? cm/sales : null;
+  const op = (cm!=null && fc!=null) ? cm - fc : null;
+  const opRate = (op!=null && sales) ? op/sales : null;
+
+  const plan = targets.monthly ? targets.monthly.total.plan : 0;
+  const achieveRate = plan ? sales/plan : 0;
+
+  let prevSales=null, prevGross=null, prevGrossRate=null, prevCm=null, prevCmRate=null, prevOp=null, prevOpRate=null;
+  if(prev){
+    prevSales = prev.sales;
+    prevGross = prev.sales - prev.cost;
+    prevGrossRate = prevSales ? prevGross/prevSales : 0;
+    const prevVc = prevKey!=null ? getSavedCostFor(prevKey,'vc') : null;
+    const prevFc = prevKey!=null ? getSavedCostFor(prevKey,'fc') : null;
+    if(prevVc!=null){ prevCm = prevGross - prevVc; prevCmRate = prevSales? prevCm/prevSales : 0; }
+    if(prevCm!=null && prevFc!=null){ prevOp = prevCm - prevFc; prevOpRate = prevSales? prevOp/prevSales : 0; }
+  }
+
+  function trendLine(curVal, prevVal){
+    if(!prevKey || curVal==null || prevVal==null) return `<div class="tk-trend">전월 비교 데이터 없음</div>`;
+    const diff = curVal - prevVal;
+    const cls = diff>=0 ? 'pos' : 'neg';
+    const arrow = diff>=0 ? '\u2197' : '\u2198';
+    return `<div class="tk-trend ${cls}">${arrow} 전월(${prevLabel}) 대비: ${diff>=0?'+':''}${fmtM(diff)}백만</div>`;
+  }
+  function ratePill(rate){
+    const cls = rate>=0 ? 'pos' : 'neg';
+    return `<span class="tk-badge ${cls}">${fmtPct(rate)}</span>`;
+  }
+
+  const cards = [
+    {
+      label: `${MONTH_CONFIGS[selectedMonth].label} 매출`, icon:'\u20a9', color:'#3D5A99',
+      value: sales, sub: `계획 ${fmtWon(plan)}`, badge: `달성율 ${fmtPct(achieveRate)}`, badgeCls: achieveRate>=1?'pos':'neg',
+      trend: trendLine(sales, prevSales),
+    },
+    {
+      label:'매출총이익', icon:'$', color:'#2A7D7B',
+      value: gross, sub: `이익률 ${fmtPct(grossRate)}`, badge: prevKey? `전월 ${fmtPct(prevGrossRate)}` : '전월 데이터 없음', badgeCls:'pos',
+      trend: trendLine(gross, prevGross),
+    },
+    {
+      label:'공헌이익', icon:'\u26a1', color:'#D97706',
+      value: cm, sub: cm!=null? `이익률 ${fmtPct(cmRate)}` : '변동비 입력 필요', badge: (prevKey && prevCmRate!=null)? `전월 ${fmtPct(prevCmRate)}` : '전월 데이터 없음', badgeCls:'pos',
+      trend: (cm!=null) ? trendLine(cm, prevCm) : `<div class="tk-trend">변동비를 입력하면 표시돼요</div>`,
+    },
+    {
+      label:'영업이익', icon:'\u25ae', color:'#3D9A9A',
+      value: op, sub: op!=null? `이익률 ${fmtPct(opRate)}` : '입력 필요', badge: (prevKey && prevOpRate!=null)? `전월 ${fmtPct(prevOpRate)}` : '전월 데이터 없음', badgeCls:'pos',
+      trend: (op!=null) ? trendLine(op, prevOp) : `<div class="tk-trend">변동비·고정비를 입력하면 표시돼요</div>`,
+    },
+  ];
+
+  grid.innerHTML = cards.map(c=>`
+    <div class="top-kpi-card">
+      <div class="tk-head">
+        <div class="tk-label">${c.label}</div>
+        <div class="tk-icon" style="background:${c.color}">${c.icon}</div>
+      </div>
+      <div class="tk-value">${c.value!=null ? fmtM(c.value)+'백만' : '입력 필요'}</div>
+      <div class="tk-sub"><span>${c.sub}</span>${c.badge?`<span class="tk-badge ${c.badgeCls}">${c.badge}</span>`:''}</div>
+      ${c.trend}
+    </div>
+  `).join('');
 }
 
 function renderKPI(){
@@ -718,16 +820,20 @@ bindMoneyInput('fcInputF', v=>{ manualFCF=v; fillProRated('fcInput', v, x=>manua
 bindMoneyInput('vcInput', v=>manualVC=v, renderProfitCalc);
 bindMoneyInput('fcInput', v=>manualFC=v, renderProfitCalc);
 
-const LS_KEYS = { vc:'ggumbi_vc', fc:'ggumbi_fc', vcF:'ggumbi_vcF', fcF:'ggumbi_fcF' };
+function lsKey(name){ return `ggumbi_${name}_${selectedMonth}`; }
 function loadSavedCosts(){
-  const vc = localStorage.getItem(LS_KEYS.vc);
-  const fc = localStorage.getItem(LS_KEYS.fc);
-  const vcF = localStorage.getItem(LS_KEYS.vcF);
-  const fcF = localStorage.getItem(LS_KEYS.fcF);
-  if(vc!=null){ manualVC=Number(vc); document.getElementById('vcInput').value = manualVC.toLocaleString('ko-KR'); }
-  if(fc!=null){ manualFC=Number(fc); document.getElementById('fcInput').value = manualFC.toLocaleString('ko-KR'); }
-  if(vcF!=null){ manualVCF=Number(vcF); document.getElementById('vcInputF').value = manualVCF.toLocaleString('ko-KR'); }
-  if(fcF!=null){ manualFCF=Number(fcF); document.getElementById('fcInputF').value = manualFCF.toLocaleString('ko-KR'); }
+  const vc = localStorage.getItem(lsKey('vc'));
+  const fc = localStorage.getItem(lsKey('fc'));
+  const vcF = localStorage.getItem(lsKey('vcF'));
+  const fcF = localStorage.getItem(lsKey('fcF'));
+  manualVC = vc!=null ? Number(vc) : null;
+  manualFC = fc!=null ? Number(fc) : null;
+  manualVCF = vcF!=null ? Number(vcF) : null;
+  manualFCF = fcF!=null ? Number(fcF) : null;
+  document.getElementById('vcInput').value = manualVC!=null ? manualVC.toLocaleString('ko-KR') : '';
+  document.getElementById('fcInput').value = manualFC!=null ? manualFC.toLocaleString('ko-KR') : '';
+  document.getElementById('vcInputF').value = manualVCF!=null ? manualVCF.toLocaleString('ko-KR') : '';
+  document.getElementById('fcInputF').value = manualFCF!=null ? manualFCF.toLocaleString('ko-KR') : '';
 }
 function flashSaved(id){
   const el = document.getElementById(id);
@@ -737,12 +843,12 @@ function flashSaved(id){
   el._t = setTimeout(()=>el.classList.remove('show'), 2000);
 }
 function saveCurrentCosts(){
-  if(manualVC!=null) localStorage.setItem(LS_KEYS.vc, manualVC); else localStorage.removeItem(LS_KEYS.vc);
-  if(manualFC!=null) localStorage.setItem(LS_KEYS.fc, manualFC); else localStorage.removeItem(LS_KEYS.fc);
+  if(manualVC!=null) localStorage.setItem(lsKey('vc'), manualVC); else localStorage.removeItem(lsKey('vc'));
+  if(manualFC!=null) localStorage.setItem(lsKey('fc'), manualFC); else localStorage.removeItem(lsKey('fc'));
 }
 function saveForecastCosts(){
-  if(manualVCF!=null) localStorage.setItem(LS_KEYS.vcF, manualVCF); else localStorage.removeItem(LS_KEYS.vcF);
-  if(manualFCF!=null) localStorage.setItem(LS_KEYS.fcF, manualFCF); else localStorage.removeItem(LS_KEYS.fcF);
+  if(manualVCF!=null) localStorage.setItem(lsKey('vcF'), manualVCF); else localStorage.removeItem(lsKey('vcF'));
+  if(manualFCF!=null) localStorage.setItem(lsKey('fcF'), manualFCF); else localStorage.removeItem(lsKey('fcF'));
 }
 document.getElementById('saveBtn').addEventListener('click', ()=>{
   saveCurrentCosts();
@@ -1134,6 +1240,7 @@ function toggleWeekNote(slot, forceOpen){
 
 
 function renderAll(){
+  renderTopKpiRow();
   renderTargetBox();
   renderWeekTargetToggle();
   renderWeekTargetBox();
