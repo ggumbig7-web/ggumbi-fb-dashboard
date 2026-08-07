@@ -102,6 +102,8 @@
   .pl-result .sub{font-size:11.5px;color:var(--muted);}
 
   .target-box{background:var(--card);border-radius:10px;padding:22px 26px;margin-bottom:24px;border-left:4px solid var(--teal);}
+  .target-grid-2col{display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start;}
+  @media (max-width:900px){.target-grid-2col{grid-template-columns:1fr;}}
   #weekTargetBox{border-left-color:var(--amber);}
   .target-box .tb-subnote{font-weight:600;font-size:12px;color:var(--muted);margin-bottom:14px;}
   .target-box .tb-est{font-weight:400;color:var(--amber);}
@@ -110,7 +112,7 @@
   .target-line .tl-label{font-weight:700;font-size:13px;min-width:120px;}
   .target-line.lvl-sub .tl-label{font-weight:600;color:var(--amber);min-width:100px;padding-left:14px;}
   .target-line .tl-nums{font-family:-apple-system,'Apple SD Gothic Neo','Noto Sans KR',sans-serif;font-size:13px;}
-  .target-line .bar-track{flex:1;min-width:140px;height:7px;background:#EFE7D8;border-radius:5px;overflow:hidden;}
+  .target-line .bar-track{flex:0 1 130px;max-width:130px;height:7px;background:#EFE7D8;border-radius:5px;overflow:hidden;}
   .target-line .bar-fill{height:100%;border-radius:5px;}
   .target-line .tl-rate{font-family:-apple-system,'Apple SD Gothic Neo','Noto Sans KR',sans-serif;font-weight:700;font-size:13px;padding:2px 9px;border-radius:999px;}
   .rate-good{background:var(--teal-light);color:var(--teal);}
@@ -166,14 +168,19 @@
     <span class="month-toggle-note" id="topMonthNote"></span>
   </div>
 
-  <div class="section-title"><h2 id="titleMonthlyTarget">7월 월간 목표 대비 실적</h2><span>VAT별도, 판매목표 ERP 시트 실시간 연동</span></div>
-  <div class="target-box" id="targetBox"></div>
-
-  <div class="section-title"><h2 id="titleWeeklyTarget">7월 주간 목표 대비 실적</h2><span>VAT별도, 판매목표 ERP 시트 실시간 연동</span></div>
-  <div class="controls" style="justify-content:flex-end;margin-bottom:6px;">
-    <div class="chan-toggle" id="weekTargetToggle"></div>
+  <div class="target-grid-2col">
+    <div>
+      <div class="section-title"><h2 id="titleMonthlyTarget">7월 월간 목표 대비 실적</h2><span>VAT별도, 판매목표 ERP 시트 실시간 연동</span></div>
+      <div class="target-box" id="targetBox"></div>
+    </div>
+    <div>
+      <div class="section-title"><h2 id="titleWeeklyTarget">7월 주간 목표 대비 실적</h2><span>VAT별도, 판매목표 ERP 시트 실시간 연동</span></div>
+      <div class="controls" style="justify-content:flex-end;margin-bottom:6px;">
+        <div class="chan-toggle" id="weekTargetToggle"></div>
+      </div>
+      <div class="target-box" id="weekTargetBox"></div>
+    </div>
   </div>
-  <div class="target-box" id="weekTargetBox"></div>
 
   <div class="section-title"><h2>현재 기준</h2><span id="currentAsOfLabel"></span></div>
   <div class="kpi-grid" id="kpiGrid"></div>
