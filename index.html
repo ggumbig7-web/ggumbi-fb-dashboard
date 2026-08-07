@@ -102,6 +102,12 @@
   .pl-result .sub{font-size:11.5px;color:var(--muted);}
 
   .target-box{background:var(--card);border-radius:10px;padding:22px 26px;margin-bottom:24px;border-left:4px solid var(--teal);display:flex;flex-direction:column;justify-content:center;flex:1;box-sizing:border-box;}
+  .date-range-row{display:flex;align-items:center;gap:14px;margin-bottom:18px;flex-wrap:wrap;}
+  .date-range-row .drr-label{font-size:12.5px;font-weight:700;color:var(--muted);}
+  .date-range-row .drr-field{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);font-weight:600;}
+  .date-range-row input[type="date"]{border:1px solid var(--card-border);border-radius:7px;padding:5px 8px;font-size:12.5px;font-family:-apple-system,'Apple SD Gothic Neo','Noto Sans KR',sans-serif;color:var(--ink);background:#fff;}
+  .date-range-row .drr-reset{border:none;background:#F0E9DB;color:var(--muted);font-size:11.5px;font-weight:600;padding:6px 12px;border-radius:7px;cursor:pointer;}
+  .date-range-row .drr-reset:hover{opacity:.85;}
   .target-grid-2col{display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:stretch;}
   .target-grid-2col > div{display:flex;flex-direction:column;}
   @media (max-width:900px){.target-grid-2col{grid-template-columns:1fr;}}
@@ -182,6 +188,12 @@
   </div>
 
   <div class="section-title"><h2>현재 기준</h2><span id="currentAsOfLabel"></span></div>
+  <div class="date-range-row">
+    <span class="drr-label">조회 기간</span>
+    <span class="drr-field">시작일 <input type="date" id="rangeStart"></span>
+    <span class="drr-field">종료일 <input type="date" id="rangeEnd"></span>
+    <button class="drr-reset" id="rangeReset">전체 기간</button>
+  </div>
   <div class="kpi-grid" id="kpiGrid"></div>
 
   <div class="pl-card">
@@ -376,6 +388,7 @@ let monthly = [];         // 1~7월 {month,is_actual,sales,cost}  (트렌드 차
 let targets = {weeks:[], monthly:null};
 let gRowsGlobal = null;   // raw 판매목표 ERP rows, for channel-week table
 let customerTargets = {}; // label(거래처/채널명) -> {weekPlans:[...], monthlyPlan} (있는 달만)
+let customRangeStart = null, customRangeEnd = null; // 현재기준 전용 사용자 지정 조회기간 (null = 해당월 전체)
 
 // Row numbers below correspond exactly to 판매목표 ERP 시트 rows (모든 월 공통 템플릿, 검증 완료).
 // 'customer' matches the 거래처 name in 각 월 거래명세서 원본의 거래처 컬럼과 정확히 일치.
@@ -510,6 +523,7 @@ async function switchToMonth(monthKey){
   activateMonthData(monthKey);
   applyMonthLabels();
   loadSavedCosts();
+  updateRangePickerBounds();
   renderAll();
 }
 
@@ -606,6 +620,13 @@ function getPeriodDays(){
   }
   return days;
 }
+function getCustomRangeDays(){
+  const days = julyPeriodDays();
+  if(customRangeStart && customRangeEnd){
+    return days.filter(d=> d.date>=customRangeStart && d.date<=customRangeEnd);
+  }
+  return days;
+}
 
 function renderTopKpiRow(){
   const grid = document.getElementById('topKpiGrid');
@@ -688,10 +709,10 @@ function renderKPI(){
   const grid = document.getElementById('kpiGrid');
   let sales, cost, label;
   if(HAS_DETAIL.has(selectedMonth)){
-    const dlist = julyPeriodDays(); // 선택된 달의 1일~말일 전체, 주차 탭 선택과 무관
+    const dlist = getCustomRangeDays(); // 지정한 조회기간(없으면 해당월 전체), 주차 탭 선택과 무관
     sales = dlist.reduce((a,d)=>a+d.sales,0);
     cost = dlist.reduce((a,d)=>a+d.cost,0);
-    label = MONTH_CONFIGS[selectedMonth].label + ' 누계';
+    label = (customRangeStart && customRangeEnd) ? `${customRangeStart}~${customRangeEnd}` : (MONTH_CONFIGS[selectedMonth].label + ' 누계');
   } else {
     const m = getMonthRow(selectedMonth);
     sales = m.sales; cost = m.cost;
@@ -770,7 +791,7 @@ let manualVC=null, manualFC=null;
 function renderProfitCalc(){
   let sales, cost;
   if(HAS_DETAIL.has(selectedMonth)){
-    const dlist = julyPeriodDays();
+    const dlist = getCustomRangeDays();
     sales = dlist.reduce((a,d)=>a+d.sales,0);
     cost = dlist.reduce((a,d)=>a+d.cost,0);
   } else {
@@ -831,6 +852,35 @@ function fillProRated(targetId, fullValue, setter, rerender){
   el.value = prorated.toLocaleString('ko-KR');
   rerender();
 }
+function updateRangePickerBounds(){
+  const cfg = MONTH_CONFIGS[selectedMonth];
+  if(!cfg) return;
+  const first = cfg.weeks[0].start, last = cfg.weeks[cfg.weeks.length-1].end;
+  const startEl = document.getElementById('rangeStart'), endEl = document.getElementById('rangeEnd');
+  startEl.min = first; startEl.max = last;
+  endEl.min = first; endEl.max = last;
+  customRangeStart = null; customRangeEnd = null;
+  startEl.value = ''; endEl.value = '';
+}
+function onRangeChange(){
+  const s = document.getElementById('rangeStart').value;
+  const e = document.getElementById('rangeEnd').value;
+  if(s && e && s<=e){ customRangeStart=s; customRangeEnd=e; }
+  else if(!s && !e){ customRangeStart=null; customRangeEnd=null; }
+  else { return; } // 시작일/종료일이 아직 둘 다 안 채워졌거나 순서가 잘못됨 - 대기
+  renderKPI();
+  renderProfitCalc();
+}
+document.getElementById('rangeStart').addEventListener('change', onRangeChange);
+document.getElementById('rangeEnd').addEventListener('change', onRangeChange);
+document.getElementById('rangeReset').addEventListener('click', ()=>{
+  document.getElementById('rangeStart').value = '';
+  document.getElementById('rangeEnd').value = '';
+  customRangeStart = null; customRangeEnd = null;
+  renderKPI();
+  renderProfitCalc();
+});
+
 function renderProfitCalcAndTop(){ renderProfitCalc(); renderTopKpiRow(); }
 bindMoneyInput('vcInputF', v=>{ manualVCF=v; fillProRated('vcInput', v, x=>manualVC=x, renderProfitCalcAndTop); }, renderProfitCalcForecast);
 bindMoneyInput('fcInputF', v=>{ manualFCF=v; fillProRated('fcInput', v, x=>manualFC=x, renderProfitCalcAndTop); }, renderProfitCalcForecast);
@@ -1256,6 +1306,7 @@ function renderAll(){
     loadSavedCosts();
     renderTopMonthToggle();
     applyMonthLabels();
+    updateRangePickerBounds();
     renderMonthChart();
     renderAll();
     document.getElementById('footerNote').textContent = '데이터 출처: 각 월 거래명세서(매출)·정리(원가, 월별 블록 W열)·판매목표 ERP(목표) (GGUMBI F&B 원가관리 통합 데이터 시트), 26년 쿠팡 채널VS쿠팡 외 (F&B 마누스 로우데이터 시트) — 모두 구글시트에서 실시간 fetch';
