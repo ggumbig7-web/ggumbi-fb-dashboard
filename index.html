@@ -203,7 +203,7 @@
     </div>
   </div>
 
-  <div class="section-title"><h2>월별 매출 추이</h2><span>1월~7월(진행중)</span></div>
+  <div class="section-title"><h2>월별 매출 추이</h2><span>1월~8월(진행중)</span></div>
   <div class="card"><div class="chart-box" style="height:260px;"><canvas id="monthChart"></canvas></div></div>
 
   <div id="julySection" style="display:none;">
@@ -332,10 +332,22 @@ const MONTH_CONFIGS = {
     ],
     monthlyPlanCol:'BT', monthlyActualCol:'BU',
   },
+  '2026-08': {
+    label:'8월', jeongliMonth:'8월', daysInMonth:31,
+    targetGid:'28081971', txGid:'2104726666', txStartRow:3,
+    txMap:{date:4, customer:8, code:12, name:11, qty:16, sales:21},
+    weeks:[
+      {week:'1주차', start:'2026-08-01', end:'2026-08-09', planCol:'BA', actualCol:'BB'},
+      {week:'2주차', start:'2026-08-10', end:'2026-08-16', planCol:'BE', actualCol:'BF'},
+      {week:'3주차', start:'2026-08-17', end:'2026-08-23', planCol:'BI', actualCol:'BJ'},
+      {week:'4주차', start:'2026-08-24', end:'2026-08-31', planCol:'BM', actualCol:'BN'},
+    ],
+    monthlyPlanCol:'BU', monthlyActualCol:'BV',
+  },
 };
 
 const custColors = ['#3D9A9A','#D97706','#6BBDBD','#B85450','#8B6914','#A3D3D2','#3D5A99','#8B6BA6'];
-const HAS_DETAIL = new Set(['2026-05','2026-06','2026-07']); // 일별 상세 데이터가 있는 달
+const HAS_DETAIL = new Set(['2026-05','2026-06','2026-07','2026-08']); // 일별 상세 데이터가 있는 달
 
 let selectedMonth = '2026-07';
 let selectedWeek = null;
@@ -500,12 +512,13 @@ async function loadAll(){
   }
 
   // 5,6,7월은 이제 각 월 거래명세서+정리 원가 기준으로 정확히 집계합니다.
-  for(const key of ['2026-05','2026-06','2026-07']){
+  const trendMonths = ['2026-05','2026-06','2026-07','2026-08'];
+  for(const key of trendMonths){
     await loadMonthData(key);
     const rows = monthCache[key].txRows;
     const sales = rows.reduce((a,r)=>a+r.sales,0);
     const cost = rows.reduce((a,r)=>a+r.cost,0);
-    monthly.push({month:key, is_actual: key!=='2026-07', sales, cost});
+    monthly.push({month:key, is_actual: key!==trendMonths[trendMonths.length-1], sales, cost});
   }
 
   activateMonthData(selectedMonth);
@@ -978,6 +991,7 @@ const AVAILABLE_MONTHS = [
   {key:'2026-05', label:'5월'},
   {key:'2026-06', label:'6월'},
   {key:'2026-07', label:'7월'},
+  {key:'2026-08', label:'8월'},
 ];
 function renderTopMonthToggle(){
   const wrap = document.getElementById('topMonthToggle');
