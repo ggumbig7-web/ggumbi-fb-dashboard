@@ -815,10 +815,11 @@ function fillProRated(targetId, fullValue, setter, rerender){
   el.value = prorated.toLocaleString('ko-KR');
   rerender();
 }
-bindMoneyInput('vcInputF', v=>{ manualVCF=v; fillProRated('vcInput', v, x=>manualVC=x, renderProfitCalc); }, renderProfitCalcForecast);
-bindMoneyInput('fcInputF', v=>{ manualFCF=v; fillProRated('fcInput', v, x=>manualFC=x, renderProfitCalc); }, renderProfitCalcForecast);
-bindMoneyInput('vcInput', v=>manualVC=v, renderProfitCalc);
-bindMoneyInput('fcInput', v=>manualFC=v, renderProfitCalc);
+function renderProfitCalcAndTop(){ renderProfitCalc(); renderTopKpiRow(); }
+bindMoneyInput('vcInputF', v=>{ manualVCF=v; fillProRated('vcInput', v, x=>manualVC=x, renderProfitCalcAndTop); }, renderProfitCalcForecast);
+bindMoneyInput('fcInputF', v=>{ manualFCF=v; fillProRated('fcInput', v, x=>manualFC=x, renderProfitCalcAndTop); }, renderProfitCalcForecast);
+bindMoneyInput('vcInput', v=>manualVC=v, renderProfitCalcAndTop);
+bindMoneyInput('fcInput', v=>manualFC=v, renderProfitCalcAndTop);
 
 function lsKey(name){ return `ggumbi_${name}_${selectedMonth}`; }
 function loadSavedCosts(){
@@ -853,12 +854,14 @@ function saveForecastCosts(){
 document.getElementById('saveBtn').addEventListener('click', ()=>{
   saveCurrentCosts();
   flashSaved('saveStatus');
+  renderTopKpiRow();
 });
 document.getElementById('saveBtnF').addEventListener('click', ()=>{
   saveForecastCosts();
   saveCurrentCosts(); // 예상마감 저장 시, 방금 일할 계산되어 채워진 현재기준 값도 함께 저장합니다.
   flashSaved('saveStatusF');
   flashSaved('saveStatus');
+  renderTopKpiRow();
 });
 
 
