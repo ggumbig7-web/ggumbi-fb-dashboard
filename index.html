@@ -86,7 +86,7 @@
   table.chan-week-table .wk-rate-bad{color:var(--rust);font-weight:600;}
 
   .pl-card{background:var(--blue-bg);border-radius:10px;padding:22px;margin-bottom:24px;border-left:4px solid var(--blue);}
-  .pl-grid{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:14px;align-items:end;}
+  .pl-grid{display:grid;grid-template-columns:2fr 1fr 1fr;gap:14px;align-items:end;}
   .pl-cost-group{display:flex;flex-direction:column;}
   .pl-cost-inputs{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
   .pl-input-box .lbl{font-size:11.5px;color:var(--blue);font-weight:700;margin-bottom:6px;}
@@ -205,8 +205,8 @@
         </div>
         <div class="pl-save-row"><button class="pl-save-btn" id="saveBtn">변동비·고정비 저장</button><span class="pl-save-status" id="saveStatus"></span></div>
         <div style="font-size:11px;color:var(--muted);margin-top:6px;">※ 예상마감에서 저장하면 이 값도 자동으로 같이 저장돼요. 여기서 직접 다른 값으로 덮어쓰고 싶을 때만 따로 눌러주세요.</div>
+        <div style="font-size:11px;color:var(--blue);margin-top:4px;" id="rangeProrationNote"></div>
       </div>
-      <div class="pl-result"><div class="k">매출총이익</div><div class="v" id="plGross">-</div><div class="sub" id="plGrossRate">-</div></div>
       <div class="pl-result"><div class="k">공헌이익</div><div class="v" id="plCM">입력 필요</div><div class="sub" id="plCMRate">-</div></div>
       <div class="pl-result"><div class="k">영업이익</div><div class="v" id="plOP">입력 필요</div><div class="sub" id="plOPRate">-</div></div>
     </div>
@@ -224,7 +224,6 @@
         </div>
         <div class="pl-save-row"><button class="pl-save-btn" id="saveBtnF">변동비·고정비 저장 (현재기준도 함께)</button><span class="pl-save-status" id="saveStatusF"></span></div>
       </div>
-      <div class="pl-result"><div class="k">매출총이익</div><div class="v" id="plGrossF">-</div><div class="sub" id="plGrossRateF">-</div></div>
       <div class="pl-result"><div class="k">공헌이익</div><div class="v" id="plCMF">입력 필요</div><div class="sub" id="plCMRateF">-</div></div>
       <div class="pl-result"><div class="k">영업이익</div><div class="v" id="plOPF">입력 필요</div><div class="sub" id="plOPRateF">-</div></div>
     </div>
@@ -798,15 +797,31 @@ function renderProfitCalc(){
     const m = getMonthRow(selectedMonth); sales=m.sales; cost=m.cost;
   }
   const gross = sales - cost;
-  document.getElementById('plGross').textContent = fmtM(gross)+'백만';
-  document.getElementById('plGrossRate').textContent = '이익률 '+fmtPct(gross/sales);
+
+  // 조회기간을 지정했으면, 월 전체 기준으로 저장해둔 변동비/고정비를 그 기간 일수만큼 비례 적용합니다.
+  // (입력칸 자체의 "월 전체" 저장값은 건드리지 않고, 계산에만 비례된 값을 씁니다.)
+  const noteEl = document.getElementById('rangeProrationNote');
+  let vcEff = manualVC, fcEff = manualFC;
+  if(customRangeStart && customRangeEnd && HAS_DETAIL.has(selectedMonth)){
+    const periodDays = getCustomRangeDays().length;
+    const totalDays = daysInSelectedMonth();
+    const factor = totalDays ? periodDays/totalDays : 1;
+    vcEff = manualVC!=null ? Math.round(manualVC*factor) : null;
+    fcEff = manualFC!=null ? Math.round(manualFC*factor) : null;
+    noteEl.textContent = (vcEff!=null || fcEff!=null)
+      ? `기간 비례 적용(${periodDays}/${totalDays}일): 변동비 ${vcEff!=null?fmtWon(vcEff):'-'}, 고정비 ${fcEff!=null?fmtWon(fcEff):'-'}`
+      : '';
+  } else {
+    noteEl.textContent = '';
+  }
+
   const cmEl=document.getElementById('plCM'), cmRateEl=document.getElementById('plCMRate');
   const opEl=document.getElementById('plOP'), opRateEl=document.getElementById('plOPRate');
-  if(manualVC==null){ cmEl.textContent='변동비 입력'; cmEl.style.color='var(--blue)'; cmRateEl.textContent='왼쪽에 입력하세요'; opEl.textContent='입력 필요'; opEl.style.color='var(--blue)'; opRateEl.textContent='-'; return; }
-  const cm = gross - manualVC;
+  if(vcEff==null){ cmEl.textContent='변동비 입력'; cmEl.style.color='var(--blue)'; cmRateEl.textContent='왼쪽에 입력하세요'; opEl.textContent='입력 필요'; opEl.style.color='var(--blue)'; opRateEl.textContent='-'; return; }
+  const cm = gross - vcEff;
   cmEl.textContent = fmtM(cm)+'백만'; cmEl.style.color='var(--ink)'; cmRateEl.textContent='이익률 '+fmtPct(cm/sales);
-  if(manualFC==null){ opEl.textContent='고정비 입력'; opEl.style.color='var(--blue)'; opRateEl.textContent='왼쪽에 입력하세요'; return; }
-  const op = cm - manualFC;
+  if(fcEff==null){ opEl.textContent='고정비 입력'; opEl.style.color='var(--blue)'; opRateEl.textContent='왼쪽에 입력하세요'; return; }
+  const op = cm - fcEff;
   opEl.textContent = fmtM(op)+'백만'; opEl.style.color = op<0?'var(--rust)':'var(--ink)'; opRateEl.textContent='이익률 '+fmtPct(op/sales);
 }
 
@@ -814,8 +829,6 @@ let manualVCF=null, manualFCF=null;
 function renderProfitCalcForecast(){
   const { sales, cost } = getForecastFigures();
   const gross = sales - cost;
-  document.getElementById('plGrossF').textContent = fmtM(gross)+'백만';
-  document.getElementById('plGrossRateF').textContent = '이익률 '+fmtPct(gross/sales);
   const cmEl=document.getElementById('plCMF'), cmRateEl=document.getElementById('plCMRateF');
   const opEl=document.getElementById('plOPF'), opRateEl=document.getElementById('plOPRateF');
   if(manualVCF==null){ cmEl.textContent='변동비 입력'; cmEl.style.color='var(--blue)'; cmRateEl.textContent='왼쪽에 입력하세요'; opEl.textContent='입력 필요'; opEl.style.color='var(--blue)'; opRateEl.textContent='-'; return; }
