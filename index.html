@@ -207,6 +207,8 @@
   <div class="card"><div class="chart-box" style="height:260px;"><canvas id="monthChart"></canvas></div></div>
 
   <div id="julySection" style="display:none;">
+    <div class="week-tabs" id="periodToggleTop"></div>
+
     <div class="section-title"><h2>거래처별 매출·매출이익</h2><span id="customerPeriodLabel"></span></div>
     <div class="card">
       <h3>거래처별 상세</h3>
@@ -221,7 +223,7 @@
         <input class="search" id="itemSearch" placeholder="품목명 검색...">
       </div>
       <div class="table-scroll">
-      <table><thead><tr><th>#</th><th>품목</th><th>수량</th><th>매출</th><th>원가</th><th>마진</th><th>마진율</th></tr></thead><tbody id="itemBody"></tbody></table>
+      <table><thead><tr><th>#</th><th>품목</th><th>수량</th><th>매출</th><th>매출비중</th><th>원가</th><th>마진</th><th>마진율</th></tr></thead><tbody id="itemBody"></tbody></table>
       </div>
     </div>
 
@@ -810,8 +812,8 @@ function renderWeekTargetBox(){
     ${targetLine('G7 쿠팡', t.coupang.plan, t.coupang.actual, t.coupang.rate, 'sub')}`;
 }
 
-function renderWeekTabs(){
-  const wrap = document.getElementById('weekTabs');
+function buildPeriodButtons(containerId){
+  const wrap = document.getElementById(containerId);
   wrap.innerHTML = '';
   const monthLabel = MONTH_CONFIGS[selectedMonth] ? MONTH_CONFIGS[selectedMonth].label : selectedMonth;
   const allBtn = document.createElement('button');
@@ -826,6 +828,10 @@ function renderWeekTabs(){
     b.onclick = ()=>{ selectedWeek=w.week; renderAll(); };
     wrap.appendChild(b);
   });
+}
+function renderWeekTabs(){
+  buildPeriodButtons('periodToggleTop');
+  buildPeriodButtons('weekTabs');
   const fullRange = weeks.length ? `${weeks[0].start}~${weeks[weeks.length-1].end}` : '';
   document.getElementById('weekRangeLabel').textContent = selectedWeek ? (weeks.find(w=>w.week===selectedWeek).start+'~'+weeks.find(w=>w.week===selectedWeek).end) : fullRange;
 }
@@ -885,14 +891,21 @@ function renderItems(){
   const filter = document.getElementById('itemSearch').value.toLowerCase();
   const agg = {};
   txRows.forEach(r=>{
+    // 선택된 기간(전체 또는 특정 주차)에 포함되는 날짜만 집계
+    if(selectedWeek){
+      const w = weeks.find(x=>x.week===selectedWeek);
+      if(r.date < w.start || r.date > w.end) return;
+    }
     if(!agg[r.code]) agg[r.code] = {name:r.name, qty:0, sales:0, cost:0};
     agg[r.code].qty+=r.qty; agg[r.code].sales+=r.sales; agg[r.code].cost+=r.cost;
   });
   const rows = Object.values(agg).filter(it=>it.name.toLowerCase().includes(filter)).sort((a,b)=>b.sales-a.sales);
+  const totS = Object.values(agg).reduce((a,it)=>a+it.sales,0);
+  document.getElementById('itemPeriodLabel').textContent = selectedWeek || (MONTH_CONFIGS[selectedMonth].label + ' 누계');
   const body = document.getElementById('itemBody');
   body.innerHTML = rows.map((it,i)=>{
     const margin = it.sales-it.cost, rate = it.sales?margin/it.sales:0;
-    return `<tr><td class="rank">${i+1}</td><td>${it.name}</td><td>${fmtNum(it.qty)}</td><td>${fmtWon(it.sales)}</td><td>${fmtWon(it.cost)}</td><td>${fmtWon(margin)}</td><td class="${rate<0?'neg':'pos'}">${fmtPct(rate)}</td></tr>`;
+    return `<tr><td class="rank">${i+1}</td><td>${it.name}</td><td>${fmtNum(it.qty)}</td><td>${fmtWon(it.sales)}</td><td>${fmtPct(totS? it.sales/totS : 0)}</td><td>${fmtWon(it.cost)}</td><td>${fmtWon(margin)}</td><td class="${rate<0?'neg':'pos'}">${fmtPct(rate)}</td></tr>`;
   }).join('');
 }
 document.getElementById('itemSearch').addEventListener('input', renderItems);
