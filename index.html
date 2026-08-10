@@ -1038,10 +1038,10 @@ function renderCoupangTrendChart(){
   document.getElementById('coupangTrendNote').textContent = '거래처별 상세 데이터가 있는 5월부터 표시됩니다 (1~4월은 거래처 단위 데이터가 없어 제외)';
   const ctx = document.getElementById('coupangTrendChart');
   if(coupangTrendChart) coupangTrendChart.destroy();
-  coupangTrendChart = new Chart(ctx, {type:'bar', data:{labels, datasets:[
-    {label:'쿠팡(백만원)', data:coupangArr, backgroundColor:'#D97706', borderRadius:5, maxBarThickness:60},
-    {label:'쿠팡 외(백만원)', data:restArr, backgroundColor:'#3D9A9A', borderRadius:5, maxBarThickness:60},
-  ]}, options:{maintainAspectRatio:false, plugins:{legend:{position:'bottom'}}, scales:{x:{stacked:true, grid:{display:false}}, y:{stacked:true, grid:{color:'#F0E9DB'}}}}});
+  coupangTrendChart = new Chart(ctx, {type:'line', data:{labels, datasets:[
+    {label:'쿠팡(백만원)', data:coupangArr, borderColor:'#D97706', backgroundColor:'#D97706', tension:0.3, pointRadius:4, pointHoverRadius:6, borderWidth:2.5},
+    {label:'쿠팡 외(백만원)', data:restArr, borderColor:'#3D9A9A', backgroundColor:'#3D9A9A', tension:0.3, pointRadius:4, pointHoverRadius:6, borderWidth:2.5},
+  ]}, options:{maintainAspectRatio:false, plugins:{legend:{position:'bottom'}}, scales:{x:{grid:{display:false}}, y:{grid:{color:'#F0E9DB'}}}}});
 }
 
 const ITEM_GROUPS = [
@@ -1080,17 +1080,20 @@ function renderItemGroupCharts(){
   document.getElementById('itemGroupTrendNote').textContent = '거래처/품목 데이터가 있는 5월부터 표시됩니다';
 
   function buildDatasets(dataArr){
-    return groupLabels.map((label,i)=>({label, data:dataArr[i], backgroundColor:ITEM_GROUP_COLORS[i%ITEM_GROUP_COLORS.length], borderRadius:3, maxBarThickness:60}));
+    return groupLabels.map((label,i)=>{
+      const color = ITEM_GROUP_COLORS[i%ITEM_GROUP_COLORS.length];
+      return {label, data:dataArr[i], borderColor:color, backgroundColor:color, tension:0.3, pointRadius:3.5, pointHoverRadius:5.5, borderWidth:2.2, fill:false};
+    });
   }
   const salesCtx = document.getElementById('itemGroupSalesChart');
   if(itemGroupSalesChart) itemGroupSalesChart.destroy();
-  itemGroupSalesChart = new Chart(salesCtx, {type:'bar', data:{labels, datasets:buildDatasets(salesData)},
-    options:{maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{boxWidth:11, font:{size:10.5}}}}, scales:{x:{stacked:true, grid:{display:false}}, y:{stacked:true, grid:{color:'#F0E9DB'}}}}});
+  itemGroupSalesChart = new Chart(salesCtx, {type:'line', data:{labels, datasets:buildDatasets(salesData)},
+    options:{maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{boxWidth:11, font:{size:10.5}}}}, scales:{x:{grid:{display:false}}, y:{grid:{color:'#F0E9DB'}}}}});
 
   const shareCtx = document.getElementById('itemGroupShareChart');
   if(itemGroupShareChart) itemGroupShareChart.destroy();
-  itemGroupShareChart = new Chart(shareCtx, {type:'bar', data:{labels, datasets:buildDatasets(shareData)},
-    options:{maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{boxWidth:11, font:{size:10.5}}}}, scales:{x:{stacked:true, grid:{display:false}}, y:{stacked:true, max:100, grid:{color:'#F0E9DB'}, ticks:{callback:v=>v+'%'}}}}});
+  itemGroupShareChart = new Chart(shareCtx, {type:'line', data:{labels, datasets:buildDatasets(shareData)},
+    options:{maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{boxWidth:11, font:{size:10.5}}}}, scales:{x:{grid:{display:false}}, y:{max:100, grid:{color:'#F0E9DB'}, ticks:{callback:v=>v+'%'}}}}});
 }
 
 function targetLine(label, plan, actual, rate, lvl){
