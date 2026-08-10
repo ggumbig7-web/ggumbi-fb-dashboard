@@ -1006,7 +1006,7 @@ function renderMonthChart(){
   const ctx = document.getElementById('monthChart');
   if(monthChart) monthChart.destroy();
   monthChart = new Chart(ctx, { type:'bar', data:{labels, datasets:[{label:'매출(백만원)', data:salesArr, backgroundColor:colors, borderRadius:5, maxBarThickness:44}]},
-    options:{plugins:{legend:{display:false}}, scales:{y:{grid:{color:'#F0E9DB'}}, x:{grid:{display:false}}}} });
+    options:{maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:{grid:{color:'#F0E9DB'}}, x:{grid:{display:false}}}} });
 }
 
 function targetLine(label, plan, actual, rate, lvl){
