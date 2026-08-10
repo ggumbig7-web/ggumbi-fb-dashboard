@@ -34,7 +34,7 @@
   .week-tab{padding:7px 14px;border-radius:10px;font-size:12px;font-weight:600;border:1px solid var(--card-border);background:#fff;color:var(--muted);cursor:pointer;}
   .week-tab.active{background:var(--amber);color:#fff;border-color:var(--amber);}
 
-  .kpi-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:24px;}
+  .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px;}
   .kpi-card{background:var(--card);border-radius:10px;padding:18px;border-left:4px solid var(--teal);}
   .top-kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px;}
   .top-kpi-card{background:var(--card);border-radius:14px;padding:20px 22px;}
@@ -92,6 +92,7 @@
   .pl-input-box .lbl{font-size:11.5px;color:var(--blue);font-weight:700;margin-bottom:6px;}
   .pl-input-box input{width:100%;border:1px solid #C9DCEC;border-radius:8px;padding:10px 12px;font-family:-apple-system,'Apple SD Gothic Neo','Noto Sans KR',sans-serif;font-size:19px;font-weight:700;color:var(--blue);background:#fff;}
   .pl-input-box input::placeholder{font-weight:400;color:#9FB8D1;font-size:15px;}
+  .pl-input-box input:disabled{background:#F3F1E9;color:var(--blue);cursor:not-allowed;}
   .pl-save-row{display:flex;align-items:center;gap:8px;margin-top:8px;}
   .pl-save-btn{border:none;background:var(--blue);color:#fff;font-size:12px;font-weight:600;padding:6px 14px;border-radius:7px;cursor:pointer;}
   .pl-save-btn:hover{opacity:.88;}
@@ -203,9 +204,8 @@
           <div class="pl-input-box"><div class="lbl">변동비 (원)</div><input type="text" inputmode="numeric" id="vcInput" placeholder="예: 15,000,000"></div>
           <div class="pl-input-box"><div class="lbl">고정비 (원)</div><input type="text" inputmode="numeric" id="fcInput" placeholder="예: 35,000,000"></div>
         </div>
-        <div class="pl-save-row"><button class="pl-save-btn" id="saveBtn">변동비·고정비 저장</button><span class="pl-save-status" id="saveStatus"></span></div>
-        <div style="font-size:11px;color:var(--muted);margin-top:6px;">※ 예상마감에서 저장하면 이 값도 자동으로 같이 저장돼요. 여기서 직접 다른 값으로 덮어쓰고 싶을 때만 따로 눌러주세요.</div>
         <div style="font-size:11px;color:var(--blue);margin-top:4px;" id="rangeProrationNote"></div>
+        <div style="font-size:11px;color:var(--muted);margin-top:6px;">※ 이 값은 아래 "예상 마감"에서 저장하면 자동으로 같이 저장돼요.</div>
       </div>
       <div class="pl-result"><div class="k">공헌이익</div><div class="v" id="plCM">입력 필요</div><div class="sub" id="plCMRate">-</div></div>
       <div class="pl-result"><div class="k">영업이익</div><div class="v" id="plOP">입력 필요</div><div class="sub" id="plOPRate">-</div></div>
@@ -798,20 +798,26 @@ function renderProfitCalc(){
   }
   const gross = sales - cost;
 
-  // 조회기간을 지정했으면, 월 전체 기준으로 저장해둔 변동비/고정비를 그 기간 일수만큼 비례 적용합니다.
-  // (입력칸 자체의 "월 전체" 저장값은 건드리지 않고, 계산에만 비례된 값을 씁니다.)
+  // 조회기간을 지정했으면, 월 전체 기준으로 저장해둔 변동비/고정비를 그 기간 일수만큼 비례 적용해서
+  // 입력칸 자체에도 그 값을 보여줍니다. (저장된 "월 전체" 값은 그대로 보존, 기간 해제 시 복원)
   const noteEl = document.getElementById('rangeProrationNote');
+  const vcEl = document.getElementById('vcInput'), fcEl = document.getElementById('fcInput');
   let vcEff = manualVC, fcEff = manualFC;
-  if(customRangeStart && customRangeEnd && HAS_DETAIL.has(selectedMonth)){
+  const rangeActive = !!(customRangeStart && customRangeEnd && HAS_DETAIL.has(selectedMonth));
+  if(rangeActive){
     const periodDays = getCustomRangeDays().length;
     const totalDays = daysInSelectedMonth();
     const factor = totalDays ? periodDays/totalDays : 1;
     vcEff = manualVC!=null ? Math.round(manualVC*factor) : null;
     fcEff = manualFC!=null ? Math.round(manualFC*factor) : null;
-    noteEl.textContent = (vcEff!=null || fcEff!=null)
-      ? `기간 비례 적용(${periodDays}/${totalDays}일): 변동비 ${vcEff!=null?fmtWon(vcEff):'-'}, 고정비 ${fcEff!=null?fmtWon(fcEff):'-'}`
-      : '';
+    vcEl.value = vcEff!=null ? vcEff.toLocaleString('ko-KR') : '';
+    fcEl.value = fcEff!=null ? fcEff.toLocaleString('ko-KR') : '';
+    vcEl.disabled = true; fcEl.disabled = true;
+    noteEl.textContent = `기간 비례 적용 중 (${periodDays}/${totalDays}일) — 저장된 월 전체 값: 변동비 ${manualVC!=null?fmtWon(manualVC):'-'}, 고정비 ${manualFC!=null?fmtWon(manualFC):'-'}`;
   } else {
+    vcEl.disabled = false; fcEl.disabled = false;
+    vcEl.value = manualVC!=null ? manualVC.toLocaleString('ko-KR') : '';
+    fcEl.value = manualFC!=null ? manualFC.toLocaleString('ko-KR') : '';
     noteEl.textContent = '';
   }
 
@@ -930,16 +936,10 @@ function saveForecastCosts(){
   if(manualVCF!=null) localStorage.setItem(lsKey('vcF'), manualVCF); else localStorage.removeItem(lsKey('vcF'));
   if(manualFCF!=null) localStorage.setItem(lsKey('fcF'), manualFCF); else localStorage.removeItem(lsKey('fcF'));
 }
-document.getElementById('saveBtn').addEventListener('click', ()=>{
-  saveCurrentCosts();
-  flashSaved('saveStatus');
-  renderTopKpiRow();
-});
 document.getElementById('saveBtnF').addEventListener('click', ()=>{
   saveForecastCosts();
   saveCurrentCosts(); // 예상마감 저장 시, 방금 일할 계산되어 채워진 현재기준 값도 함께 저장합니다.
   flashSaved('saveStatusF');
-  flashSaved('saveStatus');
   renderTopKpiRow();
 });
 
@@ -1320,11 +1320,11 @@ function renderAll(){
     renderTopMonthToggle();
     applyMonthLabels();
     updateRangePickerBounds();
+    document.getElementById('loadingMsg').style.display='none';
+    document.getElementById('mainContent').style.display='block';
     renderMonthChart();
     renderAll();
     document.getElementById('footerNote').textContent = '데이터 출처: 각 월 거래명세서(매출)·정리(원가, 월별 블록 W열)·판매목표 ERP(목표) (GGUMBI F&B 원가관리 통합 데이터 시트), 26년 쿠팡 채널VS쿠팡 외 (F&B 마누스 로우데이터 시트) — 모두 구글시트에서 실시간 fetch';
-    document.getElementById('loadingMsg').style.display='none';
-    document.getElementById('mainContent').style.display='block';
   }catch(e){
     document.getElementById('loadingMsg').textContent = '데이터를 불러오지 못했습니다: ' + e.message + ' (구글시트가 "링크가 있는 모든 사용자" 공개 상태인지 확인해주세요)';
   }
