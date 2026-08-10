@@ -332,6 +332,56 @@ function fmtPct(n){ return isFinite(n) ? (n*100).toFixed(1)+'%' : '-'; }
 // 월별 설정 — 새 달 데이터가 들어오면 여기에 항목 하나만 추가하면 됩니다.
 // txMap의 인덱스는 해당 월 거래명세서(raw) 시트의 0-based 열 번호입니다 (월마다 원본 열 배치가 다를 수 있어요).
 const MONTH_CONFIGS = {
+  '2026-01': {
+    label:'1월', jeongliMonth:'1월', daysInMonth:31,
+    targetGid:null, txGid:'1537850249', txStartRow:3,
+    txMap:{date:4, customer:8, code:12, name:11, qty:16, sales:21},
+    weeks:[
+      {week:'1주차', start:'2026-01-01', end:'2026-01-07', planCol:'AZ', actualCol:'BA'},
+      {week:'2주차', start:'2026-01-08', end:'2026-01-14', planCol:'BD', actualCol:'BE'},
+      {week:'3주차', start:'2026-01-15', end:'2026-01-21', planCol:'BH', actualCol:'BI'},
+      {week:'4주차', start:'2026-01-22', end:'2026-01-28', planCol:'BL', actualCol:'BM'},
+      {week:'5주차', start:'2026-01-29', end:'2026-01-31', planCol:'BP', actualCol:'BQ'},
+    ],
+    monthlyPlanCol:'BT', monthlyActualCol:'BU',
+  },
+  '2026-02': {
+    label:'2월', jeongliMonth:'2월', daysInMonth:28,
+    targetGid:null, txGid:'949290741', txStartRow:1,
+    txMap:{date:0, customer:1, code:2, name:3, qty:4, sales:5},
+    weeks:[
+      {week:'1주차', start:'2026-02-01', end:'2026-02-07', planCol:'AZ', actualCol:'BA'},
+      {week:'2주차', start:'2026-02-08', end:'2026-02-14', planCol:'BD', actualCol:'BE'},
+      {week:'3주차', start:'2026-02-15', end:'2026-02-21', planCol:'BH', actualCol:'BI'},
+      {week:'4주차', start:'2026-02-22', end:'2026-02-28', planCol:'BL', actualCol:'BM'},
+    ],
+    monthlyPlanCol:'BT', monthlyActualCol:'BU',
+  },
+  '2026-03': {
+    label:'3월', jeongliMonth:'3월', daysInMonth:31,
+    targetGid:null, txGid:'8139228', txStartRow:1,
+    txMap:{date:0, customer:1, code:2, name:3, qty:4, sales:5},
+    weeks:[
+      {week:'1주차', start:'2026-03-01', end:'2026-03-07', planCol:'AZ', actualCol:'BA'},
+      {week:'2주차', start:'2026-03-08', end:'2026-03-14', planCol:'BD', actualCol:'BE'},
+      {week:'3주차', start:'2026-03-15', end:'2026-03-21', planCol:'BH', actualCol:'BI'},
+      {week:'4주차', start:'2026-03-22', end:'2026-03-28', planCol:'BL', actualCol:'BM'},
+      {week:'5주차', start:'2026-03-29', end:'2026-03-31', planCol:'BP', actualCol:'BQ'},
+    ],
+    monthlyPlanCol:'BT', monthlyActualCol:'BU',
+  },
+  '2026-04': {
+    label:'4월', jeongliMonth:'4월', daysInMonth:30,
+    targetGid:null, txGid:'1749237645', txStartRow:1,
+    txMap:{date:0, customer:1, code:2, name:3, qty:4, sales:5},
+    weeks:[
+      {week:'1주차', start:'2026-04-01', end:'2026-04-07', planCol:'AZ', actualCol:'BA'},
+      {week:'2주차', start:'2026-04-08', end:'2026-04-14', planCol:'BD', actualCol:'BE'},
+      {week:'3주차', start:'2026-04-15', end:'2026-04-21', planCol:'BH', actualCol:'BI'},
+      {week:'4주차', start:'2026-04-22', end:'2026-04-30', planCol:'BL', actualCol:'BM'},
+    ],
+    monthlyPlanCol:'BT', monthlyActualCol:'BU',
+  },
   '2026-05': {
     label:'5월', jeongliMonth:'5월', daysInMonth:31,
     targetGid:'1107573904', txGid:'10662366', txStartRow:1,
@@ -385,7 +435,7 @@ const MONTH_CONFIGS = {
 };
 
 const custColors = ['#3D9A9A','#D97706','#6BBDBD','#B85450','#8B6914','#A3D3D2','#3D5A99','#8B6BA6'];
-const HAS_DETAIL = new Set(['2026-05','2026-06','2026-07','2026-08']); // 일별 상세 데이터가 있는 달
+const HAS_DETAIL = new Set(['2026-01','2026-02','2026-03','2026-04','2026-05','2026-06','2026-07','2026-08']); // 일별 상세 데이터가 있는 달
 
 let selectedMonth = '2026-07';
 let selectedWeek = null;
@@ -432,11 +482,20 @@ const CHANNEL_MAP = [
   {row:43, customer:'(주) 비바리퍼블리카', label:'Toss'},
 ];
 
-async function fetchCSV(sheetId, gid){
-  const res = await fetch(csvUrl(sheetId, gid));
-  if(!res.ok) throw new Error('fetch failed '+gid);
-  const text = await res.text();
-  return parseCSV(text);
+async function fetchCSV(sheetId, gid, retries=2){
+  for(let attempt=0; attempt<=retries; attempt++){
+    try {
+      const res = await fetch(csvUrl(sheetId, gid));
+      if(!res.ok) throw new Error('fetch failed '+gid+' status='+res.status);
+      const text = await res.text();
+      const rows = parseCSV(text);
+      if(rows.length===0) throw new Error('empty response '+gid);
+      return rows;
+    } catch(e){
+      if(attempt===retries) throw e;
+      await new Promise(r=>setTimeout(r, 500*(attempt+1))); // 구글시트 순간 요청 과다 방지용 재시도 대기
+    }
+  }
 }
 
 const monthCache = {}; // monthKey -> {unitCost, txRows, targets, gRowsGlobal}
@@ -494,10 +553,12 @@ async function loadMonthData(monthKey){
 
   // 4) targets from 해당 월 판매목표 ERP (시트가 삭제/누락됐어도 전체가 멈추지 않도록 방어)
   let gRows = [];
-  try {
-    gRows = await fetchCSV(MAIN_SHEET, cfg.targetGid);
-  } catch(e) {
-    console.warn(`[${monthKey}] 목표 시트(targetGid=${cfg.targetGid})를 불러오지 못했어요.`, e);
+  if(cfg.targetGid){
+    try {
+      gRows = await fetchCSV(MAIN_SHEET, cfg.targetGid);
+    } catch(e) {
+      console.warn(`[${monthKey}] 목표 시트(targetGid=${cfg.targetGid})를 불러오지 못했어요.`, e);
+    }
   }
   function cell(r, colLetters){ const row = gRows[r-1]; return row ? numVal(row[colIdx(colLetters)]) : 0; }
   let localTargets;
@@ -592,37 +653,14 @@ function applyMonthLabels(){
 }
 
 async function loadAll(){
-  // 1~4월은 상세 데이터가 없어 기존 히스토리 시트의 월간 합계만 사용합니다.
-  const hRows = await fetchCSV(HIST_SHEET, GID_HIST);
-  const histByMonth = {};
-  for(let r=2;r<hRows.length;r++){
-    const row = hRows[r];
-    if(!row || !row[0]) continue;
-    const ym = row[0].trim();
-    const m = ym.match(/(\d{4})년\s*(\d{1,2})월/);
-    if(!m) continue;
-    const key = `${m[1]}-${String(m[2]).padStart(2,'0')}`;
-    if(key < '2026-01' || key > '2026-04') continue;
-    const sales = numVal(row[5]);  // F열 매출액(전체)
-    const cost = numVal(row[7]);   // H열 매출원가(전체)
-    if(!histByMonth[key]) histByMonth[key] = {sales:0, cost:0};
-    histByMonth[key].sales += sales;
-    histByMonth[key].cost += cost;
-  }
-  for(let m=1;m<=4;m++){
-    const key = `2026-${String(m).padStart(2,'0')}`;
-    const d = histByMonth[key] || {sales:0,cost:0};
-    monthly.push({month:key, is_actual:true, sales:d.sales, cost:d.cost});
-  }
-
-  // 5,6,7월은 이제 각 월 거래명세서+정리 원가 기준으로 정확히 집계합니다.
-  const trendMonths = ['2026-05','2026-06','2026-07','2026-08'];
-  for(const key of trendMonths){
+  // 이제 1~8월 전부 각 월 거래명세서+정리 원가 기준으로 정확히 집계합니다.
+  for(const key of DETAIL_MONTH_ORDER){
     await loadMonthData(key);
+    await new Promise(r=>setTimeout(r, 150)); // 구글시트 요청 과다로 인한 순간 차단 방지
     const rows = monthCache[key].txRows;
     const sales = rows.reduce((a,r)=>a+r.sales,0);
     const cost = rows.reduce((a,r)=>a+r.cost,0);
-    monthly.push({month:key, is_actual: key!==trendMonths[trendMonths.length-1], sales, cost});
+    monthly.push({month:key, is_actual: key!==DETAIL_MONTH_ORDER[DETAIL_MONTH_ORDER.length-1], sales, cost});
   }
 
   activateMonthData(selectedMonth);
@@ -1002,7 +1040,7 @@ document.getElementById('saveBtnF').addEventListener('click', ()=>{
 
 let monthChart;
 let coupangTrendChart, itemGroupSalesChart, itemGroupShareChart;
-const DETAIL_MONTH_ORDER = ['2026-05','2026-06','2026-07','2026-08'];
+const DETAIL_MONTH_ORDER = ['2026-01','2026-02','2026-03','2026-04','2026-05','2026-06','2026-07','2026-08'];
 function detailMonthsUpTo(monthKey){
   const idx = DETAIL_MONTH_ORDER.indexOf(monthKey);
   return idx>=0 ? DETAIL_MONTH_ORDER.slice(0, idx+1) : DETAIL_MONTH_ORDER;
@@ -1035,7 +1073,7 @@ function renderCoupangTrendChart(){
     coupangArr.push(Math.round(coupang/1e6*10)/10);
     restArr.push(Math.round((total-coupang)/1e6*10)/10);
   });
-  document.getElementById('coupangTrendNote').textContent = '거래처별 상세 데이터가 있는 5월부터 표시됩니다 (1~4월은 거래처 단위 데이터가 없어 제외)';
+  document.getElementById('coupangTrendNote').textContent = '1월부터 해당 월까지 표시됩니다';
   const ctx = document.getElementById('coupangTrendChart');
   if(coupangTrendChart) coupangTrendChart.destroy();
   coupangTrendChart = new Chart(ctx, {type:'line', data:{labels, datasets:[
@@ -1077,7 +1115,7 @@ function renderItemGroupCharts(){
       shareData[i].push(total ? Math.round(s/total*1000)/10 : 0);
     });
   });
-  document.getElementById('itemGroupTrendNote').textContent = '거래처/품목 데이터가 있는 5월부터 표시됩니다';
+  document.getElementById('itemGroupTrendNote').textContent = '1월부터 해당 월까지 표시됩니다';
 
   function buildDatasets(dataArr){
     return groupLabels.map((label,i)=>{
@@ -1343,6 +1381,10 @@ document.querySelectorAll('#dailyChanToggle button').forEach(btn=>{
 
 // 월별 토글 설정 — 다음 달 데이터가 준비되면 이 배열에 항목만 추가하면 됩니다.
 const AVAILABLE_MONTHS = [
+  {key:'2026-01', label:'1월'},
+  {key:'2026-02', label:'2월'},
+  {key:'2026-03', label:'3월'},
+  {key:'2026-04', label:'4월'},
   {key:'2026-05', label:'5월'},
   {key:'2026-06', label:'6월'},
   {key:'2026-07', label:'7월'},
