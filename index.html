@@ -250,6 +250,11 @@
     <div class="card">
       <div class="controls">
         <input class="search" id="itemSearch" placeholder="품목명 검색...">
+        <div class="chan-toggle" id="itemChanToggle">
+          <button data-ch="전체" class="active">전체</button>
+          <button data-ch="쿠팡">쿠팡</button>
+          <button data-ch="쿠팡외">쿠팡 외</button>
+        </div>
       </div>
       <div class="table-scroll">
       <table><thead><tr><th>#</th><th>품목</th><th>수량</th><th>매출</th><th>매출비중</th><th>원가</th><th>마진</th><th>마진율</th></tr></thead><tbody id="itemBody"></tbody></table>
@@ -1348,6 +1353,7 @@ function renderCustomers(){
     : `<tr class="total-row"><td colspan="2">${totalRow.c}</td>${totalCommon}<td class="wk-plan">${planCell(totalRow)}</td>${progressCell(totalRow)}${wowCell(totalRow)}<td>${fmtWon(totalRow.cost)}</td><td>${fmtWon(totalRow.margin)}</td><td class="${totalRow.rate<0.2?'neg':'pos'}">${fmtPct(totalRow.rate)}</td></tr>`;
 }
 
+let selectedItemChannel = '전체';
 function renderItems(){
   const filter = document.getElementById('itemSearch').value.toLowerCase();
   const agg = {};
@@ -1357,6 +1363,10 @@ function renderItems(){
       const w = weeks.find(x=>x.week===selectedWeek);
       if(r.date < w.start || r.date > w.end) return;
     }
+    // 전체/쿠팡/쿠팡 외 채널 필터
+    const isCoupang = r.customer === '쿠팡 주식회사';
+    if(selectedItemChannel==='쿠팡' && !isCoupang) return;
+    if(selectedItemChannel==='쿠팡외' && isCoupang) return;
     if(!agg[r.code]) agg[r.code] = {name:r.name, qty:0, sales:0, cost:0};
     agg[r.code].qty+=r.qty; agg[r.code].sales+=r.sales; agg[r.code].cost+=r.cost;
   });
@@ -1370,6 +1380,14 @@ function renderItems(){
   }).join('');
 }
 document.getElementById('itemSearch').addEventListener('input', renderItems);
+document.querySelectorAll('#itemChanToggle button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('#itemChanToggle button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    selectedItemChannel = btn.dataset.ch;
+    renderItems();
+  });
+});
 
 document.querySelectorAll('#dailyChanToggle button').forEach(btn=>{
   btn.addEventListener('click', ()=>{
