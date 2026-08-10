@@ -229,7 +229,7 @@
     </div>
   </div>
 
-  <div class="section-title"><h2>월별 매출 추이</h2><span>1월~8월(진행중)</span></div>
+  <div class="section-title"><h2>월별 매출 추이</h2><span>1월~12월 (8월까지 진행중, 9월 이후는 예정)</span></div>
   <div class="card"><div class="chart-box" style="height:260px;"><canvas id="monthChart"></canvas></div></div>
 
   <div id="julySection" style="display:none;">
@@ -239,7 +239,7 @@
     <div class="card">
       <h3>거래처별 상세</h3>
       <div class="table-scroll">
-      <table><thead><tr><th>#</th><th>거래처</th><th>수량</th><th>매출</th><th>매출비중</th><th>목표</th><th>진척율</th><th>전주대비</th><th>원가</th><th>매출이익</th><th>이익률</th></tr></thead><tbody id="customerBody"></tbody></table>
+      <table><thead><tr id="customerTableHead"><th>#</th><th>거래처</th><th>수량</th><th>매출</th><th>매출비중</th><th>목표</th><th>진척율</th><th>전주대비</th><th>원가</th><th>매출이익</th><th>이익률</th></tr></thead><tbody id="customerBody"></tbody></table>
       </div>
     </div>
 
@@ -362,7 +362,7 @@ const MONTH_CONFIGS = {
   },
   '2026-08': {
     label:'8월', jeongliMonth:'8월', daysInMonth:31,
-    targetGid:'28081971', txGid:'2104726666', txStartRow:3,
+    targetGid:'28081971', txGid:'658326868', txStartRow:3,
     txMap:{date:4, customer:8, code:12, name:11, qty:16, sales:21},
     customerTargetGid:'1617501801', customerTargetWeekCols:[3,4,5,6], customerTargetMonthlyCol:7,
     weeks:[
@@ -465,39 +465,86 @@ async function loadMonthData(monthKey){
     localTxRows.push({date:d, customer:cust, code, name, qty, sales, cost: qty*(localUnitCost[code]||0)});
   }
 
-  // 3) targets from 해당 월 판매목표 ERP
-  const gRows = await fetchCSV(MAIN_SHEET, cfg.targetGid);
-  function cell(r, colLetters){ const row = gRows[r-1]; return row ? numVal(row[colIdx(colLetters)]) : 0; }
-  const localTargets = {weeks:[], monthly:null};
-  cfg.weeks.forEach(w=>{
-    const coupangPlan = cell(9, w.planCol), coupangActual = cell(9, w.actualCol);
-    const onlinePlan = cell(10, w.planCol), onlineActual = cell(10, w.actualCol);
-    const totalPlan = cell(44, w.planCol), totalActual = cell(44, w.actualCol);
-    localTargets.weeks.push({
-      week: w.week,
-      total:{plan:totalPlan, actual:totalActual, rate: totalPlan? totalActual/totalPlan : 0},
-      online:{plan:onlinePlan, actual:onlineActual, rate: onlinePlan? onlineActual/onlinePlan : 0},
-      coupang:{plan:coupangPlan, actual:coupangActual, rate: coupangPlan? coupangActual/coupangPlan : 0},
-    });
-  });
-  localTargets.monthly = {
-    total:{plan:cell(44,cfg.monthlyPlanCol), actual:cell(44,cfg.monthlyActualCol), rate: cell(44,cfg.monthlyPlanCol)? cell(44,cfg.monthlyActualCol)/cell(44,cfg.monthlyPlanCol) : 0},
-    online:{plan:cell(10,cfg.monthlyPlanCol), actual:cell(10,cfg.monthlyActualCol), rate: cell(10,cfg.monthlyPlanCol)? cell(10,cfg.monthlyActualCol)/cell(10,cfg.monthlyPlanCol) : 0},
-    coupang:{plan:cell(9,cfg.monthlyPlanCol), actual:cell(9,cfg.monthlyActualCol), rate: cell(9,cfg.monthlyPlanCol)? cell(9,cfg.monthlyActualCol)/cell(9,cfg.monthlyPlanCol) : 0},
-  };
-
-  // 4) 거래처별 주차 목표 (있는 달만 - 지금은 8월만)
+  // 3) 거래처별 주차 목표 (지금은 8월만 "8월 목표"류 시트가 있음) - 아래 큰 목표 시트가 없을 때 대체용으로도 씀
   const localCustomerTargets = {}; // label(거래처/채널명) -> {weekPlans:[...], monthlyPlan}
   if(cfg.customerTargetGid){
-    const ctRows = await fetchCSV(MAIN_SHEET, cfg.customerTargetGid);
-    for(let r=0;r<ctRows.length;r++){
-      const row = ctRows[r];
-      const label = row && row[1] ? row[1].trim() : '';
-      if(!label || label==='Channel') continue;
-      const weekPlans = cfg.customerTargetWeekCols.map(ci=>numVal(row[ci]));
-      const monthlyPlan = numVal(row[cfg.customerTargetMonthlyCol]);
-      localCustomerTargets[label] = {weekPlans, monthlyPlan};
+    try {
+      const ctRows = await fetchCSV(MAIN_SHEET, cfg.customerTargetGid);
+      for(let r=0;r<ctRows.length;r++){
+        const row = ctRows[r];
+        const label = row && row[1] ? row[1].trim() : '';
+        if(!label || label==='Channel') continue;
+        const weekPlans = cfg.customerTargetWeekCols.map(ci=>numVal(row[ci]));
+        const monthlyPlan = numVal(row[cfg.customerTargetMonthlyCol]);
+        localCustomerTargets[label] = {weekPlans, monthlyPlan};
+      }
+    } catch(e) {
+      console.warn(`[${monthKey}] 거래처별 목표 시트(customerTargetGid=${cfg.customerTargetGid})를 불러오지 못했어요.`, e);
     }
+  }
+
+  // 4) targets from 해당 월 판매목표 ERP (시트가 삭제/누락됐어도 전체가 멈추지 않도록 방어)
+  let gRows = [];
+  try {
+    gRows = await fetchCSV(MAIN_SHEET, cfg.targetGid);
+  } catch(e) {
+    console.warn(`[${monthKey}] 목표 시트(targetGid=${cfg.targetGid})를 불러오지 못했어요.`, e);
+  }
+  function cell(r, colLetters){ const row = gRows[r-1]; return row ? numVal(row[colIdx(colLetters)]) : 0; }
+  let localTargets;
+
+  if(gRows.length === 0 && Object.keys(localCustomerTargets).length > 0){
+    // 큰 목표 ERP 시트가 없을 때: "OO월 목표" 같은 간단한 시트의 Plan 값 + 거래명세서에서 직접 계산한 Actual로 대체
+    console.info(`[${monthKey}] targetGid 없음 → customerTargetGid(Plan) + 거래명세서(Actual)로 목표 대비 실적을 대신 계산합니다.`);
+    const coupangCustomers = new Set(CHANNEL_MAP.filter(c=>c.label==='Coupang (Direct)').map(c=>c.customer));
+    function actualSum(start, end, wantCoupang){
+      let s=0;
+      localTxRows.forEach(r=>{
+        if(r.date<start || r.date>end) return;
+        const isCoupang = coupangCustomers.has(r.customer);
+        if(isCoupang===wantCoupang) s += r.sales;
+      });
+      return s;
+    }
+    const coupangT = localCustomerTargets['Coupang (Direct)'] || {weekPlans:cfg.weeks.map(()=>0), monthlyPlan:0};
+    const grandT = localCustomerTargets['Online TTL'] || {weekPlans:cfg.weeks.map(()=>0), monthlyPlan:0}; // 시트에 두 번 나오는데, 마지막(그랑드토탈)이 남습니다
+    localTargets = {weeks:[], monthly:null};
+    cfg.weeks.forEach((w,i)=>{
+      const coupangPlan = coupangT.weekPlans[i]||0, totalPlan = grandT.weekPlans[i]||0, onlinePlan = totalPlan-coupangPlan;
+      const coupangActual = actualSum(w.start,w.end,true), totalActual = actualSum(w.start,w.end,false)+coupangActual, onlineActual = totalActual-coupangActual;
+      localTargets.weeks.push({
+        week: w.week,
+        total:{plan:totalPlan, actual:totalActual, rate: totalPlan? totalActual/totalPlan : 0},
+        online:{plan:onlinePlan, actual:onlineActual, rate: onlinePlan? onlineActual/onlinePlan : 0},
+        coupang:{plan:coupangPlan, actual:coupangActual, rate: coupangPlan? coupangActual/coupangPlan : 0},
+      });
+    });
+    const monthStart = cfg.weeks[0].start, monthEnd = cfg.weeks[cfg.weeks.length-1].end;
+    const mCoupangPlan = coupangT.monthlyPlan||0, mTotalPlan = grandT.monthlyPlan||0, mOnlinePlan = mTotalPlan-mCoupangPlan;
+    const mCoupangActual = actualSum(monthStart,monthEnd,true), mTotalActual = actualSum(monthStart,monthEnd,false)+mCoupangActual, mOnlineActual = mTotalActual-mCoupangActual;
+    localTargets.monthly = {
+      total:{plan:mTotalPlan, actual:mTotalActual, rate: mTotalPlan? mTotalActual/mTotalPlan : 0},
+      online:{plan:mOnlinePlan, actual:mOnlineActual, rate: mOnlinePlan? mOnlineActual/mOnlinePlan : 0},
+      coupang:{plan:mCoupangPlan, actual:mCoupangActual, rate: mCoupangPlan? mCoupangActual/mCoupangPlan : 0},
+    };
+  } else {
+    localTargets = {weeks:[], monthly:null};
+    cfg.weeks.forEach(w=>{
+      const coupangPlan = cell(9, w.planCol), coupangActual = cell(9, w.actualCol);
+      const onlinePlan = cell(10, w.planCol), onlineActual = cell(10, w.actualCol);
+      const totalPlan = cell(44, w.planCol), totalActual = cell(44, w.actualCol);
+      localTargets.weeks.push({
+        week: w.week,
+        total:{plan:totalPlan, actual:totalActual, rate: totalPlan? totalActual/totalPlan : 0},
+        online:{plan:onlinePlan, actual:onlineActual, rate: onlinePlan? onlineActual/onlinePlan : 0},
+        coupang:{plan:coupangPlan, actual:coupangActual, rate: coupangPlan? coupangActual/coupangPlan : 0},
+      });
+    });
+    localTargets.monthly = {
+      total:{plan:cell(44,cfg.monthlyPlanCol), actual:cell(44,cfg.monthlyActualCol), rate: cell(44,cfg.monthlyPlanCol)? cell(44,cfg.monthlyActualCol)/cell(44,cfg.monthlyPlanCol) : 0},
+      online:{plan:cell(10,cfg.monthlyPlanCol), actual:cell(10,cfg.monthlyActualCol), rate: cell(10,cfg.monthlyPlanCol)? cell(10,cfg.monthlyActualCol)/cell(10,cfg.monthlyPlanCol) : 0},
+      coupang:{plan:cell(9,cfg.monthlyPlanCol), actual:cell(9,cfg.monthlyActualCol), rate: cell(9,cfg.monthlyPlanCol)? cell(9,cfg.monthlyActualCol)/cell(9,cfg.monthlyPlanCol) : 0},
+    };
   }
 
   monthCache[monthKey] = {unitCost:localUnitCost, txRows:localTxRows, targets:localTargets, gRowsGlobal:gRows, customerTargets:localCustomerTargets};
@@ -946,9 +993,16 @@ document.getElementById('saveBtnF').addEventListener('click', ()=>{
 
 let monthChart;
 function renderMonthChart(){
-  const labels = monthly.map(m=>m.month);
-  const salesArr = monthly.map(m=>m.sales/1_000_000);
-  const colors = monthly.map(m=>m.is_actual?'#3D9A9A':'#A3D3D2');
+  const FULL_YEAR_MONTHS = ['2026-01','2026-02','2026-03','2026-04','2026-05','2026-06','2026-07','2026-08','2026-09','2026-10','2026-11','2026-12'];
+  const byMonth = {};
+  monthly.forEach(m=>{ byMonth[m.month] = m; });
+  const labels = FULL_YEAR_MONTHS;
+  const salesArr = FULL_YEAR_MONTHS.map(mo => byMonth[mo] ? byMonth[mo].sales/1_000_000 : null);
+  const colors = FULL_YEAR_MONTHS.map(mo => {
+    const m = byMonth[mo];
+    if(!m) return '#F0E9DB'; // 아직 데이터가 없는 미래 달 - 아주 옅은 색으로 자리만 표시
+    return m.is_actual ? '#3D9A9A' : '#A3D3D2';
+  });
   const ctx = document.getElementById('monthChart');
   if(monthChart) monthChart.destroy();
   monthChart = new Chart(ctx, { type:'bar', data:{labels, datasets:[{label:'매출(백만원)', data:salesArr, backgroundColor:colors, borderRadius:5, maxBarThickness:44}]},
@@ -1069,6 +1123,13 @@ function sumSalesForCustomer(customer, start, end){
   txRows.forEach(r=>{ if(r.customer===customer && r.date>=start && r.date<=end) s+=r.sales; });
   return s;
 }
+function prevMonthCustomerSales(customer){
+  const prevKey = prevMonthKey(selectedMonth);
+  if(!prevKey || !monthCache[prevKey]) return null;
+  let s=0;
+  monthCache[prevKey].txRows.forEach(r=>{ if(r.customer===customer) s+=r.sales; });
+  return s;
+}
 function renderCustomers(){
   const dlist = getPeriodDays();
   const agg = {};
@@ -1078,9 +1139,9 @@ function renderCustomers(){
       agg[c].qty+=v.qty; agg[c].sales+=v.sales; agg[c].cost+=v.cost;
     });
   });
+  const isAll = !selectedWeek; // "전체(N월)" 보기인지 여부 - 이때만 전월매출/증감율로 바꿔서 보여줍니다
   const weekIdx = selectedWeek ? weeks.findIndex(w=>w.week===selectedWeek) : -1;
   const prevWeek = (weekIdx>0) ? weeks[weekIdx-1] : null;
-  const hasTargets = Object.keys(customerTargets).length>0;
 
   const rows = Object.entries(agg).map(([c,v])=>{
     const key = getCustomerTargetKey(c);
@@ -1089,11 +1150,18 @@ function renderCustomers(){
     if(t){ plan = selectedWeek ? (weekIdx>=0 ? t.weekPlans[weekIdx] : null) : t.monthlyPlan; }
     const progress = (plan!=null && plan>0) ? v.sales/plan : null;
     let wow = null;
-    if(prevWeek){
-      const prevSales = sumSalesForCustomer(c, prevWeek.start, prevWeek.end);
-      if(prevSales>0) wow = (v.sales-prevSales)/prevSales;
+    if(isAll){
+      const prevMonthSales = prevMonthCustomerSales(c);
+      if(prevMonthSales!=null && prevMonthSales>0) wow = (v.sales-prevMonthSales)/prevMonthSales;
+      var prevPeriodSales = prevMonthSales;
+    } else {
+      if(prevWeek){
+        const prevSales = sumSalesForCustomer(c, prevWeek.start, prevWeek.end);
+        if(prevSales>0) wow = (v.sales-prevSales)/prevSales;
+        prevPeriodSales = prevSales;
+      } else { prevPeriodSales = null; }
     }
-    return {c, ...v, margin:v.sales-v.cost, rate:v.sales?(v.sales-v.cost)/v.sales:0, plan, progress, wow};
+    return {c, ...v, margin:v.sales-v.cost, rate:v.sales?(v.sales-v.cost)/v.sales:0, plan, progress, wow, prevPeriodSales};
   }).filter(r=>r.sales>0).sort((a,b)=>b.sales-a.sales);
 
   document.getElementById('customerPeriodLabel').textContent = selectedWeek || (MONTH_CONFIGS[selectedMonth].label + ' 누계');
@@ -1112,20 +1180,46 @@ function renderCustomers(){
     const arrow = r.wow>=0?'▲':'▼';
     return `<td class="${cls}">${arrow} ${fmtPct(Math.abs(r.wow))}</td>`;
   };
+  const prevSalesCell = (r) => r.prevPeriodSales!=null ? fmtWon(r.prevPeriodSales) : '-';
 
-  body.innerHTML = rows.map((r,i)=>`<tr><td class="rank">${i+1}</td><td>${r.c}</td><td>${fmtNum(r.qty)}</td><td>${fmtWon(r.sales)}</td><td>${fmtPct(totS? r.sales/totS : 0)}</td><td class="wk-plan">${planCell(r)}</td>${progressCell(r)}${wowCell(r)}<td>${fmtWon(r.cost)}</td><td>${fmtWon(r.margin)}</td><td class="${r.rate<0.2?'neg':'pos'}">${fmtPct(r.rate)}</td></tr>`).join('');
+  // 헤더: "전체(N월)"일 때만 순서/구성이 다릅니다 (전월매출/증감율이 매출비중 바로 다음, 목표보다 앞)
+  const head = document.getElementById('customerTableHead');
+  head.innerHTML = isAll
+    ? '<th>#</th><th>거래처</th><th>수량</th><th>매출</th><th>매출비중</th><th>전월매출</th><th>증감율</th><th>목표</th><th>진척율</th><th>원가</th><th>매출이익</th><th>이익률</th>'
+    : '<th>#</th><th>거래처</th><th>수량</th><th>매출</th><th>매출비중</th><th>목표</th><th>진척율</th><th>전주대비</th><th>원가</th><th>매출이익</th><th>이익률</th>';
+
+  function rowHtml(r, rankLabel, shareText){
+    const common = `<td>${fmtNum(r.qty)}</td><td>${fmtWon(r.sales)}</td><td>${shareText}</td>`;
+    if(isAll){
+      return `<td class="rank">${rankLabel}</td><td>${r.c}</td>${common}<td class="wk-plan">${prevSalesCell(r)}</td>${wowCell(r)}<td class="wk-plan">${planCell(r)}</td>${progressCell(r)}<td>${fmtWon(r.cost)}</td><td>${fmtWon(r.margin)}</td><td class="${r.rate<0.2?'neg':'pos'}">${fmtPct(r.rate)}</td>`;
+    }
+    return `<td class="rank">${rankLabel}</td><td>${r.c}</td>${common}<td class="wk-plan">${planCell(r)}</td>${progressCell(r)}${wowCell(r)}<td>${fmtWon(r.cost)}</td><td>${fmtWon(r.margin)}</td><td class="${r.rate<0.2?'neg':'pos'}">${fmtPct(r.rate)}</td>`;
+  }
+
+  body.innerHTML = rows.map((r,i)=>`<tr>${rowHtml(r, i+1, fmtPct(totS? r.sales/totS : 0))}</tr>`).join('');
 
   // 합계 행: 목표는 시트의 공식 TTL(온라인 전체) 행을 그대로 사용 (개별 매칭 누락으로 인한 과소집계 방지)
   const ttl = customerTargets['Online TTL'];
   const totalPlan = ttl ? (selectedWeek ? (weekIdx>=0? ttl.weekPlans[weekIdx] : null) : ttl.monthlyPlan) : null;
   const totalProgress = (totalPlan!=null && totalPlan>0) ? totS/totalPlan : null;
-  let totalWow = null;
-  if(prevWeek){
+  let totalPrevPeriod = null, totalWow = null;
+  if(isAll){
+    const prevKey = prevMonthKey(selectedMonth);
+    if(prevKey && monthCache[prevKey]){
+      totalPrevPeriod = monthCache[prevKey].txRows.reduce((a,r)=>a+r.sales,0);
+      if(totalPrevPeriod>0) totalWow = (totS-totalPrevPeriod)/totalPrevPeriod;
+    }
+  } else if(prevWeek){
     let prevTotal = 0;
     txRows.forEach(r=>{ if(r.date>=prevWeek.start && r.date<=prevWeek.end) prevTotal+=r.sales; });
+    totalPrevPeriod = prevTotal;
     if(prevTotal>0) totalWow = (totS-prevTotal)/prevTotal;
   }
-  body.innerHTML += `<tr class="total-row"><td colspan="2">합계 (${rows.length}개)</td><td>${fmtNum(totQ)}</td><td>${fmtWon(totS)}</td><td>100.0%</td><td class="wk-plan">${totalPlan!=null?fmtWon(totalPlan):'-'}</td>${progressCell({progress:totalProgress})}${wowCell({wow:totalWow})}<td>${fmtWon(totC)}</td><td>${fmtWon(totS-totC)}</td><td>${fmtPct((totS-totC)/totS)}</td></tr>`;
+  const totalRow = {c:`합계 (${rows.length}개)`, sales:totS, cost:totC, qty:totQ, plan:totalPlan, progress:totalProgress, wow:totalWow, prevPeriodSales:totalPrevPeriod, margin:totS-totC, rate:totS?(totS-totC)/totS:0};
+  const totalCommon = `<td>${fmtNum(totalRow.qty)}</td><td>${fmtWon(totalRow.sales)}</td><td>100.0%</td>`;
+  body.innerHTML += isAll
+    ? `<tr class="total-row"><td colspan="2">${totalRow.c}</td>${totalCommon}<td class="wk-plan">${prevSalesCell(totalRow)}</td>${wowCell(totalRow)}<td class="wk-plan">${planCell(totalRow)}</td>${progressCell(totalRow)}<td>${fmtWon(totalRow.cost)}</td><td>${fmtWon(totalRow.margin)}</td><td class="${totalRow.rate<0.2?'neg':'pos'}">${fmtPct(totalRow.rate)}</td></tr>`
+    : `<tr class="total-row"><td colspan="2">${totalRow.c}</td>${totalCommon}<td class="wk-plan">${planCell(totalRow)}</td>${progressCell(totalRow)}${wowCell(totalRow)}<td>${fmtWon(totalRow.cost)}</td><td>${fmtWon(totalRow.margin)}</td><td class="${totalRow.rate<0.2?'neg':'pos'}">${fmtPct(totalRow.rate)}</td></tr>`;
 }
 
 function renderItems(){
