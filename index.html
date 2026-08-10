@@ -519,9 +519,10 @@ async function loadMonthData(monthKey){
   const localTxRows = [];
   const tRows = await fetchCSV(MAIN_SHEET, cfg.txGid);
   const tm = cfg.txMap;
+  const minCols = Math.max(tm.date, tm.customer, tm.code, tm.name, tm.qty, tm.sales) + 1;
   for(let r=cfg.txStartRow;r<tRows.length;r++){
     const row = tRows[r];
-    if(!row || row.length < 15) continue;
+    if(!row || row.length < minCols) continue;
     let d = row[tm.date];
     const code = row[tm.code];
     const name = row[tm.name];
