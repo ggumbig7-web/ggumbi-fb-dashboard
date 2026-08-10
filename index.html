@@ -243,6 +243,9 @@
       </div>
     </div>
 
+    <div class="section-title"><h2>쿠팡 vs 쿠팡 외 매출 추이</h2><span id="coupangTrendNote"></span></div>
+    <div class="card"><div class="chart-box" style="height:280px;"><canvas id="coupangTrendChart"></canvas></div></div>
+
     <div class="section-title"><h2>품목별 수익성</h2><span id="itemPeriodLabel">7월 누계</span></div>
     <div class="card">
       <div class="controls">
@@ -251,6 +254,12 @@
       <div class="table-scroll">
       <table><thead><tr><th>#</th><th>품목</th><th>수량</th><th>매출</th><th>매출비중</th><th>원가</th><th>마진</th><th>마진율</th></tr></thead><tbody id="itemBody"></tbody></table>
       </div>
+    </div>
+
+    <div class="section-title"><h2>주요 품목군 매출 추이</h2><span id="itemGroupTrendNote"></span></div>
+    <div class="grid-2">
+      <div class="card"><h3 style="margin:0 0 10px;font-size:13px;">매출 (백만원)</h3><div class="chart-box" style="height:280px;"><canvas id="itemGroupSalesChart"></canvas></div></div>
+      <div class="card"><h3 style="margin:0 0 10px;font-size:13px;">매출비중 (%)</h3><div class="chart-box" style="height:280px;"><canvas id="itemGroupShareChart"></canvas></div></div>
     </div>
 
     <div class="section-title"><h2 id="titleWeeklyCompare">7월 주차별 비교</h2><span id="weekRangeLabel"></span></div>
@@ -992,6 +1001,12 @@ document.getElementById('saveBtnF').addEventListener('click', ()=>{
 
 
 let monthChart;
+let coupangTrendChart, itemGroupSalesChart, itemGroupShareChart;
+const DETAIL_MONTH_ORDER = ['2026-05','2026-06','2026-07','2026-08'];
+function detailMonthsUpTo(monthKey){
+  const idx = DETAIL_MONTH_ORDER.indexOf(monthKey);
+  return idx>=0 ? DETAIL_MONTH_ORDER.slice(0, idx+1) : DETAIL_MONTH_ORDER;
+}
 function renderMonthChart(){
   const FULL_YEAR_MONTHS = ['2026-01','2026-02','2026-03','2026-04','2026-05','2026-06','2026-07','2026-08','2026-09','2026-10','2026-11','2026-12'];
   const byMonth = {};
@@ -1007,6 +1022,75 @@ function renderMonthChart(){
   if(monthChart) monthChart.destroy();
   monthChart = new Chart(ctx, { type:'bar', data:{labels, datasets:[{label:'매출(백만원)', data:salesArr, backgroundColor:colors, borderRadius:5, maxBarThickness:44}]},
     options:{maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:{grid:{color:'#F0E9DB'}}, x:{grid:{display:false}}}} });
+}
+
+function renderCoupangTrendChart(){
+  const months = detailMonthsUpTo(selectedMonth);
+  const labels = months.map(m=>MONTH_CONFIGS[m].label);
+  const coupangArr = [], restArr = [];
+  months.forEach(m=>{
+    const rows = monthCache[m] ? monthCache[m].txRows : [];
+    let coupang=0, total=0;
+    rows.forEach(r=>{ total+=r.sales; if(r.customer==='쿠팡 주식회사') coupang+=r.sales; });
+    coupangArr.push(Math.round(coupang/1e6*10)/10);
+    restArr.push(Math.round((total-coupang)/1e6*10)/10);
+  });
+  document.getElementById('coupangTrendNote').textContent = '거래처별 상세 데이터가 있는 5월부터 표시됩니다 (1~4월은 거래처 단위 데이터가 없어 제외)';
+  const ctx = document.getElementById('coupangTrendChart');
+  if(coupangTrendChart) coupangTrendChart.destroy();
+  coupangTrendChart = new Chart(ctx, {type:'bar', data:{labels, datasets:[
+    {label:'쿠팡(백만원)', data:coupangArr, backgroundColor:'#D97706', borderRadius:5, maxBarThickness:60},
+    {label:'쿠팡 외(백만원)', data:restArr, backgroundColor:'#3D9A9A', borderRadius:5, maxBarThickness:60},
+  ]}, options:{maintainAspectRatio:false, plugins:{legend:{position:'bottom'}}, scales:{x:{stacked:true, grid:{display:false}}, y:{stacked:true, grid:{color:'#F0E9DB'}}}}});
+}
+
+const ITEM_GROUPS = [
+  {label:'퓨어블랙 200개입', names:['[G7] G7 퓨어블랙 200개입']},
+  {label:'퓨어블랙 100개입', names:['[G7] G7 퓨어블랙 100개입']},
+  {label:'퓨어블랙 라이트', names:['[G7] G7 퓨어블랙 라이트 110개입','[G7] G7 퓨어블랙 라이트 230개입','[G7] G7 퓨어블랙 라이트 160개입','[G7] G7 퓨어블랙 라이트 25개입']},
+  {label:'3in1', names:['[G7] G7 3in1 100개입','[G7] G7 3in1 100개입 / 베트남PKG','[G7] G7 3in1 50개입','[G7] G7 3in1 50개입 / 베트남PKG']},
+  {label:'3in1 Mild', names:['[G7] G7 3in1 Mild 120개입','[G7] G7 3in1 Mild 80개입','[G7] G7 3in1 Mild 20개입','[G7] G7 3in1 Mild 45개입']},
+];
+const ITEM_GROUP_COLORS = ['#2A7D7B','#D97706','#3D5A99','#B85450','#8B6914','#A3D3D2'];
+function computeItemGroupsForMonth(monthKey){
+  const rows = monthCache[monthKey] ? monthCache[monthKey].txRows : [];
+  const sums = ITEM_GROUPS.map(()=>0);
+  let total = 0;
+  rows.forEach(r=>{
+    total += r.sales;
+    const gi = ITEM_GROUPS.findIndex(g=>g.names.includes(r.name));
+    if(gi>=0) sums[gi] += r.sales;
+  });
+  const etc = total - sums.reduce((a,b)=>a+b,0);
+  return {sums:[...sums, etc], total};
+}
+function renderItemGroupCharts(){
+  const months = detailMonthsUpTo(selectedMonth);
+  const labels = months.map(m=>MONTH_CONFIGS[m].label);
+  const groupLabels = [...ITEM_GROUPS.map(g=>g.label), '기타'];
+  const salesData = groupLabels.map(()=>[]);
+  const shareData = groupLabels.map(()=>[]);
+  months.forEach(m=>{
+    const {sums, total} = computeItemGroupsForMonth(m);
+    sums.forEach((s,i)=>{
+      salesData[i].push(Math.round(s/1e6*10)/10);
+      shareData[i].push(total ? Math.round(s/total*1000)/10 : 0);
+    });
+  });
+  document.getElementById('itemGroupTrendNote').textContent = '거래처/품목 데이터가 있는 5월부터 표시됩니다';
+
+  function buildDatasets(dataArr){
+    return groupLabels.map((label,i)=>({label, data:dataArr[i], backgroundColor:ITEM_GROUP_COLORS[i%ITEM_GROUP_COLORS.length], borderRadius:3, maxBarThickness:60}));
+  }
+  const salesCtx = document.getElementById('itemGroupSalesChart');
+  if(itemGroupSalesChart) itemGroupSalesChart.destroy();
+  itemGroupSalesChart = new Chart(salesCtx, {type:'bar', data:{labels, datasets:buildDatasets(salesData)},
+    options:{maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{boxWidth:11, font:{size:10.5}}}}, scales:{x:{stacked:true, grid:{display:false}}, y:{stacked:true, grid:{color:'#F0E9DB'}}}}});
+
+  const shareCtx = document.getElementById('itemGroupShareChart');
+  if(itemGroupShareChart) itemGroupShareChart.destroy();
+  itemGroupShareChart = new Chart(shareCtx, {type:'bar', data:{labels, datasets:buildDatasets(shareData)},
+    options:{maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{boxWidth:11, font:{size:10.5}}}}, scales:{x:{stacked:true, grid:{display:false}}, y:{stacked:true, max:100, grid:{color:'#F0E9DB'}, ticks:{callback:v=>v+'%'}}}}});
 }
 
 function targetLine(label, plan, actual, rate, lvl){
@@ -1402,7 +1486,9 @@ function renderAll(){
     renderWeekTabs();
     renderDaily();
     renderCustomers();
+    renderCoupangTrendChart();
     renderItems();
+    renderItemGroupCharts();
     renderWeekNoteList();
   }
 }
