@@ -1006,16 +1006,39 @@ bindMoneyInput('fcInputF', v=>{ manualFCF=v; fillProRated('fcInput', v, x=>manua
 bindMoneyInput('vcInput', v=>manualVC=v, renderProfitCalcAndTop);
 bindMoneyInput('fcInput', v=>manualFC=v, renderProfitCalcAndTop);
 
+// ---- 여러 PC에서 공유되는 설정(변동비/고정비, 주차별 메모 제목·내용) 동기화 ----
+const SETTINGS_API_URL = 'https://script.google.com/macros/s/AKfycbys5GCaFgXK09sEX3hikBDKwTkk07aKeb4G8umObLaPTtwCaCw6gX0-nJiGmhxEiXV3/exec';
+let remoteSettings = {};
+let remoteSettingsLoaded = false;
+async function loadRemoteSettings(){
+  try {
+    const res = await fetch(SETTINGS_API_URL + '?action=getAll&_t=' + Date.now(), {cache:'no-store'});
+    const json = await res.json();
+    if(json && json.ok) remoteSettings = json.data || {};
+    remoteSettingsLoaded = true;
+  } catch(e) {
+    console.warn('공유 설정을 불러오지 못했어요 (이 PC에 저장된 값만 사용합니다).', e);
+    remoteSettingsLoaded = false;
+  }
+}
+function remoteSet(key, value){
+  // 실패해도 화면 동작을 막지 않도록 fire-and-forget으로 호출합니다. (이 PC의 localStorage는 이미 저장된 상태)
+  fetch(SETTINGS_API_URL + '?action=set&key=' + encodeURIComponent(key) + '&value=' + encodeURIComponent(value) + '&_t=' + Date.now())
+    .catch(e => console.warn('공유 설정 저장 실패 (이 PC에는 저장됨):', key, e));
+}
+
 function lsKey(name){ return `ggumbi_${name}_${selectedMonth}`; }
 function loadSavedCosts(){
-  const vc = localStorage.getItem(lsKey('vc'));
-  const fc = localStorage.getItem(lsKey('fc'));
-  const vcF = localStorage.getItem(lsKey('vcF'));
-  const fcF = localStorage.getItem(lsKey('fcF'));
-  manualVC = vc!=null ? Number(vc) : null;
-  manualFC = fc!=null ? Number(fc) : null;
-  manualVCF = vcF!=null ? Number(vcF) : null;
-  manualFCF = fcF!=null ? Number(fcF) : null;
+  function readVal(name){
+    const key = lsKey(name);
+    if(remoteSettings[key] !== undefined && remoteSettings[key] !== '') return Number(remoteSettings[key]);
+    const local = localStorage.getItem(key);
+    return local!=null ? Number(local) : null;
+  }
+  manualVC = readVal('vc');
+  manualFC = readVal('fc');
+  manualVCF = readVal('vcF');
+  manualFCF = readVal('fcF');
   document.getElementById('vcInput').value = manualVC!=null ? manualVC.toLocaleString('ko-KR') : '';
   document.getElementById('fcInput').value = manualFC!=null ? manualFC.toLocaleString('ko-KR') : '';
   document.getElementById('vcInputF').value = manualVCF!=null ? manualVCF.toLocaleString('ko-KR') : '';
@@ -1029,12 +1052,18 @@ function flashSaved(id){
   el._t = setTimeout(()=>el.classList.remove('show'), 2000);
 }
 function saveCurrentCosts(){
-  if(manualVC!=null) localStorage.setItem(lsKey('vc'), manualVC); else localStorage.removeItem(lsKey('vc'));
-  if(manualFC!=null) localStorage.setItem(lsKey('fc'), manualFC); else localStorage.removeItem(lsKey('fc'));
+  const vcKey = lsKey('vc'), fcKey = lsKey('fc');
+  if(manualVC!=null){ localStorage.setItem(vcKey, manualVC); remoteSettings[vcKey]=manualVC; remoteSet(vcKey, manualVC); }
+  else { localStorage.removeItem(vcKey); delete remoteSettings[vcKey]; remoteSet(vcKey, ''); }
+  if(manualFC!=null){ localStorage.setItem(fcKey, manualFC); remoteSettings[fcKey]=manualFC; remoteSet(fcKey, manualFC); }
+  else { localStorage.removeItem(fcKey); delete remoteSettings[fcKey]; remoteSet(fcKey, ''); }
 }
 function saveForecastCosts(){
-  if(manualVCF!=null) localStorage.setItem(lsKey('vcF'), manualVCF); else localStorage.removeItem(lsKey('vcF'));
-  if(manualFCF!=null) localStorage.setItem(lsKey('fcF'), manualFCF); else localStorage.removeItem(lsKey('fcF'));
+  const vcKey = lsKey('vcF'), fcKey = lsKey('fcF');
+  if(manualVCF!=null){ localStorage.setItem(vcKey, manualVCF); remoteSettings[vcKey]=manualVCF; remoteSet(vcKey, manualVCF); }
+  else { localStorage.removeItem(vcKey); delete remoteSettings[vcKey]; remoteSet(vcKey, ''); }
+  if(manualFCF!=null){ localStorage.setItem(fcKey, manualFCF); remoteSettings[fcKey]=manualFCF; remoteSet(fcKey, manualFCF); }
+  else { localStorage.removeItem(fcKey); delete remoteSettings[fcKey]; remoteSet(fcKey, ''); }
 }
 document.getElementById('saveBtnF').addEventListener('click', ()=>{
   saveForecastCosts();
@@ -1432,19 +1461,34 @@ function escapeHtml(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;'
 const NOTE_SLOTS = [1,2,3,4,5];
 function noteKey(week, slot){ return `ggumbi_note_${selectedMonth}_${week}_slot${slot}`; }
 function loadNote(week, slot){
+  const key = noteKey(week, slot);
+  let local = {title:'', content:'', image:null};
   try {
-    const raw = localStorage.getItem(noteKey(week, slot));
-    return raw ? JSON.parse(raw) : {title:'', content:'', image:null};
-  } catch(e){ return {title:'', content:'', image:null}; }
+    const raw = localStorage.getItem(key);
+    if(raw) local = JSON.parse(raw);
+  } catch(e){}
+  // 제목·내용은 다른 PC와 공유되는 값을 우선 사용하고, 이미지는 이 PC에 저장된 것만 사용합니다.
+  if(remoteSettings[key]){
+    try {
+      const remote = JSON.parse(remoteSettings[key]);
+      return {title: remote.title || '', content: remote.content || '', image: local.image};
+    } catch(e){}
+  }
+  return local;
 }
 function saveNote(week, slot, title, content, image){
+  const key = noteKey(week, slot);
   try {
-    localStorage.setItem(noteKey(week, slot), JSON.stringify({title, content, image}));
+    localStorage.setItem(key, JSON.stringify({title, content, image}));
   } catch(e){
     // 이미지가 너무 커서 저장 용량을 초과한 경우, 이미지 없이 텍스트만이라도 저장
-    try { localStorage.setItem(noteKey(week, slot), JSON.stringify({title, content, image:null})); alert('이미지 용량이 너무 커서 이미지는 저장하지 못했어요. 더 작은 이미지로 다시 시도해주세요.'); }
+    try { localStorage.setItem(key, JSON.stringify({title, content, image:null})); alert('이미지 용량이 너무 커서 이미지는 저장하지 못했어요. 더 작은 이미지로 다시 시도해주세요.'); }
     catch(e2){}
   }
+  // 제목·내용만 다른 PC에도 공유되도록 저장합니다 (이미지는 이 PC에만 남습니다).
+  const shared = JSON.stringify({title, content});
+  remoteSettings[key] = shared;
+  remoteSet(key, shared);
 }
 let pendingImages = {}; // slot -> base64 (저장 전 미리보기용, 현재 보이는 주차 기준)
 
@@ -1559,7 +1603,7 @@ function renderAll(){
 
 (async function init(){
   try{
-    await loadAll();
+    await Promise.all([loadAll(), loadRemoteSettings()]);
     loadSavedCosts();
     renderTopMonthToggle();
     applyMonthLabels();
