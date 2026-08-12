@@ -177,6 +177,8 @@
     <div class="chan-toggle" id="weekTargetToggle" style="margin-left:auto;"></div>
   </div>
 
+  <div id="sectionNoteTopSummary"></div>
+
   <div class="target-grid-2col">
     <div>
       <div class="section-title"><h2 id="titleMonthlyTarget">7월 월간 목표 대비 실적</h2><span>VAT별도, 판매목표 ERP 시트 실시간 연동</span></div>
@@ -228,6 +230,8 @@
       <div class="pl-result"><div class="k">영업이익</div><div class="v" id="plOPF">입력 필요</div><div class="sub" id="plOPRateF">-</div></div>
     </div>
   </div>
+
+  <div id="sectionNoteForecast"></div>
 
   <div id="julySection" style="display:none;">
     <div class="week-tabs" id="periodToggleTop"></div>
@@ -1552,7 +1556,14 @@ function saveNote(week, slot, title, content, image){
   remoteSet(key, shared);
 }
 
-// ---- 차트 섹션 메모 (쿠팡 vs 쿠팡 외 / 주요 품목군 추이) — 월과 무관하게 하나씩만 있는 메모, 다른 PC와 공유됩니다 ----
+// ---- 차트/섹션 메모 (쿠팡 vs 쿠팡 외 / 주요 품목군 추이 / 예상마감 / 상단요약) — 월별로 따로 저장되고, 다른 PC와도 공유됩니다 ----
+const SECTION_NOTE_LIST = [
+  {containerId:'sectionNoteTopSummary', baseKey:'ggumbi_note_topSummary'},
+  {containerId:'sectionNoteForecast', baseKey:'ggumbi_note_forecast'},
+  {containerId:'sectionNoteCoupangTrend', baseKey:'ggumbi_note_coupangTrend'},
+  {containerId:'sectionNoteItemGroupTrend', baseKey:'ggumbi_note_itemGroupTrend'},
+];
+function sectionNoteKey(baseKey){ return `${baseKey}_${selectedMonth}`; }
 function loadSectionNote(storageKey){
   let local = {title:'', content:''};
   try { const raw = localStorage.getItem(storageKey); if(raw) local = JSON.parse(raw); } catch(e){}
@@ -1588,12 +1599,15 @@ function renderSectionNoteCard(containerId){
       </div>
     </div>`;
 }
-function initSectionNote(containerId, storageKey){
-  renderSectionNoteCard(containerId);
-  const note = loadSectionNote(storageKey);
+function refreshSectionNote(containerId, baseKey){
+  const note = loadSectionNote(sectionNoteKey(baseKey));
   document.getElementById(`${containerId}-titledisplay`).textContent = note.title || '제목 없음';
   document.getElementById(`${containerId}-title`).value = note.title || '';
   document.getElementById(`${containerId}-content`).value = note.content || '';
+}
+function initSectionNote(containerId, baseKey){
+  renderSectionNoteCard(containerId);
+  refreshSectionNote(containerId, baseKey);
 
   const arrow = document.getElementById(`${containerId}-arrow`);
   const wrap = document.getElementById(`${containerId}-bodywrap`);
@@ -1605,14 +1619,16 @@ function initSectionNote(containerId, storageKey){
   document.getElementById(`${containerId}-savebtn`).addEventListener('click', ()=>{
     const title = document.getElementById(`${containerId}-title`).value;
     const content = document.getElementById(`${containerId}-content`).value;
-    saveSectionNote(storageKey, title, content);
+    saveSectionNote(sectionNoteKey(baseKey), title, content); // 항상 "현재 선택된 달" 기준으로 저장 → 월이 바뀌어도 이전 달 메모는 그대로 남습니다.
     document.getElementById(`${containerId}-titledisplay`).textContent = title || '제목 없음';
     flashSaved(`${containerId}-savestatus`);
   });
 }
 function initAllSectionNotes(){
-  initSectionNote('sectionNoteCoupangTrend', 'ggumbi_note_coupangTrend');
-  initSectionNote('sectionNoteItemGroupTrend', 'ggumbi_note_itemGroupTrend');
+  SECTION_NOTE_LIST.forEach(({containerId, baseKey}) => initSectionNote(containerId, baseKey));
+}
+function refreshAllSectionNotes(){
+  SECTION_NOTE_LIST.forEach(({containerId, baseKey}) => refreshSectionNote(containerId, baseKey));
 }
 let pendingImages = {}; // slot -> base64 (저장 전 미리보기용, 현재 보이는 주차 기준)
 
@@ -1713,6 +1729,7 @@ function renderAll(){
   renderProfitCalc();
   renderKPIForecast();
   renderProfitCalcForecast();
+  refreshAllSectionNotes();
   document.getElementById('julySection').style.display = HAS_DETAIL.has(selectedMonth) ? 'block' : 'none';
   if(HAS_DETAIL.has(selectedMonth)){
     renderWeekTabs();
@@ -1734,8 +1751,8 @@ function renderAll(){
     updateRangePickerBounds();
     document.getElementById('loadingMsg').style.display='none';
     document.getElementById('mainContent').style.display='block';
-    renderAll();
     initAllSectionNotes();
+    renderAll();
     document.getElementById('footerNote').textContent = '데이터 출처: 각 월 거래명세서(매출)·정리(원가, 월별 블록 W열)·판매목표 ERP(목표) (GGUMBI F&B 원가관리 통합 데이터 시트), 26년 쿠팡 채널VS쿠팡 외 (F&B 마누스 로우데이터 시트) — 모두 구글시트에서 실시간 fetch';
   }catch(e){
     document.getElementById('loadingMsg').textContent = '데이터를 불러오지 못했습니다: ' + e.message + ' (구글시트가 "링크가 있는 모든 사용자" 공개 상태인지 확인해주세요)';
