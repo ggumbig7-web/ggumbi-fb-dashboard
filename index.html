@@ -231,6 +231,7 @@
 
   <div class="section-title"><h2>월별 매출 추이</h2><span>1월~12월 (8월까지 진행중, 9월 이후는 예정)</span></div>
   <div class="card"><div class="chart-box" style="height:260px;"><canvas id="monthChart"></canvas></div></div>
+  <div id="sectionNoteMonthlyTrend"></div>
 
   <div id="julySection" style="display:none;">
     <div class="week-tabs" id="periodToggleTop"></div>
@@ -245,6 +246,7 @@
 
     <div class="section-title"><h2>쿠팡 vs 쿠팡 외 매출 추이</h2><span id="coupangTrendNote"></span></div>
     <div class="card"><div class="chart-box" style="height:280px;"><canvas id="coupangTrendChart"></canvas></div></div>
+    <div id="sectionNoteCoupangTrend"></div>
 
     <div class="section-title"><h2>품목별 수익성</h2><span id="itemPeriodLabel">7월 누계</span></div>
     <div class="card">
@@ -266,6 +268,7 @@
       <div class="card"><h3 style="margin:0 0 10px;font-size:13px;">매출 (백만원)</h3><div class="chart-box" style="height:280px;"><canvas id="itemGroupSalesChart"></canvas></div></div>
       <div class="card"><h3 style="margin:0 0 10px;font-size:13px;">매출비중 (%)</h3><div class="chart-box" style="height:280px;"><canvas id="itemGroupShareChart"></canvas></div></div>
     </div>
+    <div id="sectionNoteItemGroupTrend"></div>
 
     <div class="section-title"><h2 id="titleWeeklyCompare">7월 주차별 비교</h2><span id="weekRangeLabel"></span></div>
     <div class="week-tabs" id="weekTabs"></div>
@@ -731,7 +734,6 @@ function renderTopKpiRow(){
   const grid = document.getElementById('topKpiGrid');
   const cur = getMonthRow(selectedMonth) || {sales:0, cost:0};
   const prevKey = prevMonthKey(selectedMonth);
-  const prev = prevKey ? getMonthRow(prevKey) : null;
   const prevLabel = prevKey ? MONTH_CONFIGS[prevKey].label : null;
 
   const sales = cur.sales, cost = cur.cost;
@@ -745,15 +747,32 @@ function renderTopKpiRow(){
   const plan = targets.monthly ? targets.monthly.total.plan : 0;
   const achieveRate = plan ? sales/plan : 0;
 
+  // 전월 대비는 "전월 전체"가 아니라, 이번 달 데이터가 있는 일수만큼만 전월의 동일 기간(1일~N일)을 잘라서 비교합니다.
+  function sameDayRangeRow(monthKey, maxDay){
+    const data = monthCache[monthKey];
+    if(!data) return null;
+    const rows = data.txRows.filter(r=> Number(String(r.date).slice(8,10)) <= maxDay);
+    const s = rows.reduce((a,r)=>a+r.sales,0);
+    const c = rows.reduce((a,r)=>a+r.cost,0);
+    return {sales:s, cost:c};
+  }
+  const curDays = txRows.length ? txRows.map(r=>Number(String(r.date).slice(8,10))) : [];
+  const curMaxDay = curDays.length ? Math.max(...curDays) : daysInSelectedMonth();
+  const prevSamePeriod = prevKey ? sameDayRangeRow(prevKey, curMaxDay) : null;
+
   let prevSales=null, prevGross=null, prevGrossRate=null, prevCm=null, prevCmRate=null, prevOp=null, prevOpRate=null;
-  if(prev){
-    prevSales = prev.sales;
-    prevGross = prev.sales - prev.cost;
+  if(prevSamePeriod){
+    prevSales = prevSamePeriod.sales;
+    prevGross = prevSamePeriod.sales - prevSamePeriod.cost;
     prevGrossRate = prevSales ? prevGross/prevSales : 0;
     const prevVc = prevKey!=null ? getSavedCostFor(prevKey,'vc') : null;
     const prevFc = prevKey!=null ? getSavedCostFor(prevKey,'fc') : null;
-    if(prevVc!=null){ prevCm = prevGross - prevVc; prevCmRate = prevSales? prevCm/prevSales : 0; }
-    if(prevCm!=null && prevFc!=null){ prevOp = prevCm - prevFc; prevOpRate = prevSales? prevOp/prevSales : 0; }
+    const prevDaysInMonth = (MONTH_CONFIGS[prevKey] && MONTH_CONFIGS[prevKey].daysInMonth) || 31;
+    const prevFactor = prevDaysInMonth ? curMaxDay/prevDaysInMonth : 1;
+    const prevVcSame = prevVc!=null ? prevVc*prevFactor : null;
+    const prevFcSame = prevFc!=null ? prevFc*prevFactor : null;
+    if(prevVcSame!=null){ prevCm = prevGross - prevVcSame; prevCmRate = prevSales? prevCm/prevSales : 0; }
+    if(prevCm!=null && prevFcSame!=null){ prevOp = prevCm - prevFcSame; prevOpRate = prevSales? prevOp/prevSales : 0; }
   }
 
   function trendLine(curVal, prevVal){
@@ -761,7 +780,7 @@ function renderTopKpiRow(){
     const diff = curVal - prevVal;
     const cls = diff>=0 ? 'pos' : 'neg';
     const arrow = diff>=0 ? '\u2197' : '\u2198';
-    return `<div class="tk-trend ${cls}">${arrow} 전월(${prevLabel}) 대비: ${diff>=0?'+':''}${fmtM(diff)}백만</div>`;
+    return `<div class="tk-trend ${cls}">${arrow} 전월(${prevLabel}) 동일기간(1~${curMaxDay}일) 대비: ${diff>=0?'+':''}${fmtM(diff)}백만</div>`;
   }
   function ratePill(rate){
     const cls = rate>=0 ? 'pos' : 'neg';
@@ -771,7 +790,7 @@ function renderTopKpiRow(){
   const cards = [
     {
       label: `${MONTH_CONFIGS[selectedMonth].label} 매출`, icon:'\u20a9', color:'#3D5A99',
-      value: sales, sub: `계획 ${fmtWon(plan)}`, badge: `달성율 ${fmtPct(achieveRate)}`, badgeCls: achieveRate>=1?'pos':'neg',
+      value: sales, sub: `계획 ${fmtWon(plan)}`, badge: `진척율 ${fmtPct(achieveRate)}`, badgeCls: achieveRate>=1?'pos':'neg',
       trend: trendLine(sales, prevSales),
     },
     {
@@ -870,6 +889,11 @@ function getForecastFigures(){
 
   return { sales, cost, daysWithData, isComplete:false };
 }
+// 목표 수치 (매출총이익률 24%, 변동비율 9% 이하 → 공헌이익률 목표는 그 차이인 15%)
+const MARGIN_TARGET_RATE = 0.24;
+const VC_TARGET_RATE = 0.09;
+const CM_TARGET_RATE = MARGIN_TARGET_RATE - VC_TARGET_RATE;
+
 function renderKPIForecast(){
   const grid = document.getElementById('kpiGridForecast');
   const { sales, cost, daysWithData, isComplete } = getForecastFigures();
@@ -878,11 +902,25 @@ function renderKPIForecast(){
   document.getElementById('forecastAsOfLabel').textContent = isComplete
     ? `${label} 전체(${daysWithData}일치) 데이터가 이미 다 들어와 있어 예측 없이 실적 그대로 표시 중`
     : `품목별 판매 수량을 각 품목의 실제 판매일수 기준으로 ${daysInSelectedMonth()}일까지 환산 → 품목 원가단가 재적용 (전체 실적 ${daysWithData}일치)`;
+
+  const plan = targets.monthly ? targets.monthly.total.plan : 0;
+  const rate = sales ? margin/sales : 0;
+
+  const salesSub = plan ? `목표 ${fmtWon(plan)} · 진척율 ${fmtPct(sales/plan)}` : `목표 데이터 없음`;
+  let costSub = `목표 데이터 없음`;
+  if(plan){
+    const costTarget = plan*(1-MARGIN_TARGET_RATE);
+    const overBudget = cost>costTarget;
+    costSub = `<span style="${overBudget?'color:var(--rust)':''}">목표 ${fmtWon(costTarget)} 이하 · 진척율 ${fmtPct(cost/costTarget)}</span>`;
+  }
+  const marginSub = plan ? `목표 ${fmtWon(plan*MARGIN_TARGET_RATE)} · 진척율 ${fmtPct(margin/(plan*MARGIN_TARGET_RATE))}` : `목표 데이터 없음`;
+  const rateSub = `목표 ${fmtPct(MARGIN_TARGET_RATE)} · 진척율 ${fmtPct(rate/MARGIN_TARGET_RATE)}`;
+
   grid.innerHTML = `
-    <div class="kpi-card"><div class="k">매출</div><div class="v">${fmtM(sales)}백만</div><div class="sub">${fmtWon(sales)}</div></div>
-    <div class="kpi-card"><div class="k">매출원가</div><div class="v">${fmtM(cost)}백만</div><div class="sub">${fmtWon(cost)}</div></div>
-    <div class="kpi-card"><div class="k">매출총이익</div><div class="v">${fmtM(margin)}백만</div><div class="sub">${fmtWon(margin)}</div></div>
-    <div class="kpi-card"><div class="k">이익률</div><div class="v">${fmtPct(margin/sales)}</div><div class="sub">${isComplete?label+' 확정':'예상 마감'}</div></div>
+    <div class="kpi-card"><div class="k">매출</div><div class="v">${fmtM(sales)}백만</div><div class="sub">${salesSub}</div></div>
+    <div class="kpi-card"><div class="k">매출원가</div><div class="v">${fmtM(cost)}백만</div><div class="sub">${costSub}</div></div>
+    <div class="kpi-card"><div class="k">매출총이익</div><div class="v">${fmtM(margin)}백만</div><div class="sub">${marginSub}</div></div>
+    <div class="kpi-card"><div class="k">이익률</div><div class="v">${fmtPct(rate)}</div><div class="sub">${rateSub}</div></div>
   `;
 }
 
@@ -939,7 +977,8 @@ function renderProfitCalcForecast(){
   const opEl=document.getElementById('plOPF'), opRateEl=document.getElementById('plOPRateF');
   if(manualVCF==null){ cmEl.textContent='변동비 입력'; cmEl.style.color='var(--blue)'; cmRateEl.textContent='왼쪽에 입력하세요'; opEl.textContent='입력 필요'; opEl.style.color='var(--blue)'; opRateEl.textContent='-'; return; }
   const cm = gross - manualVCF;
-  cmEl.textContent = fmtM(cm)+'백만'; cmEl.style.color='var(--ink)'; cmRateEl.textContent='이익률 '+fmtPct(cm/sales);
+  cmEl.textContent = fmtM(cm)+'백만'; cmEl.style.color='var(--ink)';
+  cmRateEl.textContent = `이익률 ${fmtPct(cm/sales)} · 목표 ${fmtPct(CM_TARGET_RATE)}`;
   if(manualFCF==null){ opEl.textContent='고정비 입력'; opEl.style.color='var(--blue)'; opRateEl.textContent='왼쪽에 입력하세요'; return; }
   const op = cm - manualFCF;
   opEl.textContent = fmtM(op)+'백만'; opEl.style.color = op<0?'var(--rust)':'var(--ink)'; opRateEl.textContent='이익률 '+fmtPct(op/sales);
@@ -1290,6 +1329,13 @@ function prevMonthCustomerSales(customer){
   monthCache[prevKey].txRows.forEach(r=>{ if(r.customer===customer) s+=r.sales; });
   return s;
 }
+function sumSalesForCustomerInMonth(monthKey, customer, start, end){
+  const data = monthCache[monthKey];
+  if(!data) return 0;
+  let s = 0;
+  data.txRows.forEach(r=>{ if(r.customer===customer && r.date>=start && r.date<=end) s+=r.sales; });
+  return s;
+}
 function renderCustomers(){
   const dlist = getPeriodDays();
   const agg = {};
@@ -1302,6 +1348,23 @@ function renderCustomers(){
   const isAll = !selectedWeek; // "전체(N월)" 보기인지 여부 - 이때만 전월매출/증감율로 바꿔서 보여줍니다
   const weekIdx = selectedWeek ? weeks.findIndex(w=>w.week===selectedWeek) : -1;
   const prevWeek = (weekIdx>0) ? weeks[weekIdx-1] : null;
+  // 주차 보기일 때: "전월 대비"는 전월의 같은 주차 라벨이 아니라, 이번 주차와 같은 날짜(일자) 구간으로 전월을 비교합니다.
+  // 예: 8월 1주차가 8/1~8/9이면 → 전월(7월)도 똑같이 1~9일(7/1~7/9)로 잘라서 비교 (7월 자체 "1주차" 정의와는 무관)
+  const prevMonthKeyForWeeks = prevMonthKey(selectedMonth);
+  function dateInMonth(monthKey, day){
+    const cfg = MONTH_CONFIGS[monthKey];
+    const maxDay = cfg ? cfg.daysInMonth : 31;
+    const d = Math.min(day, maxDay);
+    return `${monthKey}-${String(d).padStart(2,'0')}`;
+  }
+  let prevRangeStart = null, prevRangeEnd = null;
+  if(!isAll && weekIdx>=0 && prevMonthKeyForWeeks){
+    const curWeek = weeks[weekIdx];
+    const startDay = Number(curWeek.start.slice(8,10));
+    const endDay = Number(curWeek.end.slice(8,10));
+    prevRangeStart = dateInMonth(prevMonthKeyForWeeks, startDay);
+    prevRangeEnd = dateInMonth(prevMonthKeyForWeeks, endDay);
+  }
 
   const rows = Object.entries(agg).map(([c,v])=>{
     const key = getCustomerTargetKey(c);
@@ -1321,7 +1384,12 @@ function renderCustomers(){
         prevPeriodSales = prevSales;
       } else { prevPeriodSales = null; }
     }
-    return {c, ...v, margin:v.sales-v.cost, rate:v.sales?(v.sales-v.cost)/v.sales:0, plan, progress, wow, prevPeriodSales};
+    let mom = null;
+    if(!isAll && prevRangeStart && prevMonthKeyForWeeks){
+      const prevMonthWeekSales = sumSalesForCustomerInMonth(prevMonthKeyForWeeks, c, prevRangeStart, prevRangeEnd);
+      if(prevMonthWeekSales>0) mom = (v.sales-prevMonthWeekSales)/prevMonthWeekSales;
+    }
+    return {c, ...v, margin:v.sales-v.cost, rate:v.sales?(v.sales-v.cost)/v.sales:0, plan, progress, wow, mom, prevPeriodSales};
   }).filter(r=>r.sales>0).sort((a,b)=>b.sales-a.sales);
 
   document.getElementById('customerPeriodLabel').textContent = selectedWeek || (MONTH_CONFIGS[selectedMonth].label + ' 누계');
@@ -1340,20 +1408,26 @@ function renderCustomers(){
     const arrow = r.wow>=0?'▲':'▼';
     return `<td class="${cls}">${arrow} ${fmtPct(Math.abs(r.wow))}</td>`;
   };
+  const momCell = (r) => {
+    if(r.mom==null) return '<td class="wk-plan">-</td>';
+    const cls = r.mom>=0?'pos':'neg';
+    const arrow = r.mom>=0?'▲':'▼';
+    return `<td class="${cls}">${arrow} ${fmtPct(Math.abs(r.mom))}</td>`;
+  };
   const prevSalesCell = (r) => r.prevPeriodSales!=null ? fmtWon(r.prevPeriodSales) : '-';
 
   // 헤더: "전체(N월)"일 때만 순서/구성이 다릅니다 (전월매출/증감율이 매출비중 바로 다음, 목표보다 앞)
   const head = document.getElementById('customerTableHead');
   head.innerHTML = isAll
     ? '<th>#</th><th>거래처</th><th>수량</th><th>매출</th><th>매출비중</th><th>전월매출</th><th>증감율</th><th>목표</th><th>진척율</th><th>원가</th><th>매출이익</th><th>이익률</th>'
-    : '<th>#</th><th>거래처</th><th>수량</th><th>매출</th><th>매출비중</th><th>목표</th><th>진척율</th><th>전주대비</th><th>원가</th><th>매출이익</th><th>이익률</th>';
+    : '<th>#</th><th>거래처</th><th>수량</th><th>매출</th><th>매출비중</th><th>목표</th><th>진척율</th><th>전주대비</th><th>전월(동일주차)대비</th><th>원가</th><th>매출이익</th><th>이익률</th>';
 
   function rowHtml(r, rankLabel, shareText){
     const common = `<td>${fmtNum(r.qty)}</td><td>${fmtWon(r.sales)}</td><td>${shareText}</td>`;
     if(isAll){
       return `<td class="rank">${rankLabel}</td><td>${r.c}</td>${common}<td class="wk-plan">${prevSalesCell(r)}</td>${wowCell(r)}<td class="wk-plan">${planCell(r)}</td>${progressCell(r)}<td>${fmtWon(r.cost)}</td><td>${fmtWon(r.margin)}</td><td class="${r.rate<0.2?'neg':'pos'}">${fmtPct(r.rate)}</td>`;
     }
-    return `<td class="rank">${rankLabel}</td><td>${r.c}</td>${common}<td class="wk-plan">${planCell(r)}</td>${progressCell(r)}${wowCell(r)}<td>${fmtWon(r.cost)}</td><td>${fmtWon(r.margin)}</td><td class="${r.rate<0.2?'neg':'pos'}">${fmtPct(r.rate)}</td>`;
+    return `<td class="rank">${rankLabel}</td><td>${r.c}</td>${common}<td class="wk-plan">${planCell(r)}</td>${progressCell(r)}${wowCell(r)}${momCell(r)}<td>${fmtWon(r.cost)}</td><td>${fmtWon(r.margin)}</td><td class="${r.rate<0.2?'neg':'pos'}">${fmtPct(r.rate)}</td>`;
   }
 
   body.innerHTML = rows.map((r,i)=>`<tr>${rowHtml(r, i+1, fmtPct(totS? r.sales/totS : 0))}</tr>`).join('');
@@ -1362,7 +1436,7 @@ function renderCustomers(){
   const ttl = customerTargets['Online TTL'];
   const totalPlan = ttl ? (selectedWeek ? (weekIdx>=0? ttl.weekPlans[weekIdx] : null) : ttl.monthlyPlan) : null;
   const totalProgress = (totalPlan!=null && totalPlan>0) ? totS/totalPlan : null;
-  let totalPrevPeriod = null, totalWow = null;
+  let totalPrevPeriod = null, totalWow = null, totalMom = null;
   if(isAll){
     const prevKey = prevMonthKey(selectedMonth);
     if(prevKey && monthCache[prevKey]){
@@ -1375,11 +1449,16 @@ function renderCustomers(){
     totalPrevPeriod = prevTotal;
     if(prevTotal>0) totalWow = (totS-prevTotal)/prevTotal;
   }
-  const totalRow = {c:`합계 (${rows.length}개)`, sales:totS, cost:totC, qty:totQ, plan:totalPlan, progress:totalProgress, wow:totalWow, prevPeriodSales:totalPrevPeriod, margin:totS-totC, rate:totS?(totS-totC)/totS:0};
+  if(!isAll && prevRangeStart && prevMonthKeyForWeeks && monthCache[prevMonthKeyForWeeks]){
+    let prevMonthWeekTotal = 0;
+    monthCache[prevMonthKeyForWeeks].txRows.forEach(r=>{ if(r.date>=prevRangeStart && r.date<=prevRangeEnd) prevMonthWeekTotal+=r.sales; });
+    if(prevMonthWeekTotal>0) totalMom = (totS-prevMonthWeekTotal)/prevMonthWeekTotal;
+  }
+  const totalRow = {c:`합계 (${rows.length}개)`, sales:totS, cost:totC, qty:totQ, plan:totalPlan, progress:totalProgress, wow:totalWow, mom:totalMom, prevPeriodSales:totalPrevPeriod, margin:totS-totC, rate:totS?(totS-totC)/totS:0};
   const totalCommon = `<td>${fmtNum(totalRow.qty)}</td><td>${fmtWon(totalRow.sales)}</td><td>100.0%</td>`;
   body.innerHTML += isAll
     ? `<tr class="total-row"><td colspan="2">${totalRow.c}</td>${totalCommon}<td class="wk-plan">${prevSalesCell(totalRow)}</td>${wowCell(totalRow)}<td class="wk-plan">${planCell(totalRow)}</td>${progressCell(totalRow)}<td>${fmtWon(totalRow.cost)}</td><td>${fmtWon(totalRow.margin)}</td><td class="${totalRow.rate<0.2?'neg':'pos'}">${fmtPct(totalRow.rate)}</td></tr>`
-    : `<tr class="total-row"><td colspan="2">${totalRow.c}</td>${totalCommon}<td class="wk-plan">${planCell(totalRow)}</td>${progressCell(totalRow)}${wowCell(totalRow)}<td>${fmtWon(totalRow.cost)}</td><td>${fmtWon(totalRow.margin)}</td><td class="${totalRow.rate<0.2?'neg':'pos'}">${fmtPct(totalRow.rate)}</td></tr>`;
+    : `<tr class="total-row"><td colspan="2">${totalRow.c}</td>${totalCommon}<td class="wk-plan">${planCell(totalRow)}</td>${progressCell(totalRow)}${wowCell(totalRow)}${momCell(totalRow)}<td>${fmtWon(totalRow.cost)}</td><td>${fmtWon(totalRow.margin)}</td><td class="${totalRow.rate<0.2?'neg':'pos'}">${fmtPct(totalRow.rate)}</td></tr>`;
 }
 
 let selectedItemChannel = '전체';
@@ -1489,6 +1568,70 @@ function saveNote(week, slot, title, content, image){
   const shared = JSON.stringify({title, content});
   remoteSettings[key] = shared;
   remoteSet(key, shared);
+}
+
+// ---- 차트 섹션 메모 (월별 매출 추이 / 쿠팡 vs 쿠팡 외 / 주요 품목군 추이) — 월과 무관하게 하나씩만 있는 메모, 다른 PC와 공유됩니다 ----
+function loadSectionNote(storageKey){
+  let local = {title:'', content:''};
+  try { const raw = localStorage.getItem(storageKey); if(raw) local = JSON.parse(raw); } catch(e){}
+  if(remoteSettings[storageKey]){
+    try {
+      const remote = JSON.parse(remoteSettings[storageKey]);
+      return {title: remote.title || '', content: remote.content || ''};
+    } catch(e){}
+  }
+  return local;
+}
+function saveSectionNote(storageKey, title, content){
+  try { localStorage.setItem(storageKey, JSON.stringify({title, content})); } catch(e){}
+  const shared = JSON.stringify({title, content});
+  remoteSettings[storageKey] = shared;
+  remoteSet(storageKey, shared);
+}
+function renderSectionNoteCard(containerId){
+  const el = document.getElementById(containerId);
+  if(!el) return;
+  el.innerHTML = `
+    <div class="card week-note-item" id="${containerId}-card">
+      <div class="week-note-header">
+        <button class="week-note-arrow" id="${containerId}-arrow">▲</button>
+        <span class="week-note-week-label">메모</span>
+        <div class="week-note-title-display" id="${containerId}-titledisplay">제목 없음</div>
+        <span class="pl-save-status" id="${containerId}-savestatus"></span>
+      </div>
+      <div id="${containerId}-bodywrap" style="display:block;padding:0 22px 22px;">
+        <input type="text" id="${containerId}-title" class="week-note-title" placeholder="제목을 입력하세요 (예: 분석 메모)">
+        <textarea id="${containerId}-content" class="week-note-content" placeholder="자유롭게 작성하세요"></textarea>
+        <div class="pl-save-row" style="margin-top:14px;"><button class="pl-save-btn" id="${containerId}-savebtn">저장</button></div>
+      </div>
+    </div>`;
+}
+function initSectionNote(containerId, storageKey){
+  renderSectionNoteCard(containerId);
+  const note = loadSectionNote(storageKey);
+  document.getElementById(`${containerId}-titledisplay`).textContent = note.title || '제목 없음';
+  document.getElementById(`${containerId}-title`).value = note.title || '';
+  document.getElementById(`${containerId}-content`).value = note.content || '';
+
+  const arrow = document.getElementById(`${containerId}-arrow`);
+  const wrap = document.getElementById(`${containerId}-bodywrap`);
+  document.querySelector(`#${containerId}-card .week-note-header`).addEventListener('click', ()=>{
+    const nowCollapsed = arrow.classList.toggle('collapsed');
+    arrow.textContent = nowCollapsed ? '▼' : '▲';
+    wrap.style.display = nowCollapsed ? 'none' : 'block';
+  });
+  document.getElementById(`${containerId}-savebtn`).addEventListener('click', ()=>{
+    const title = document.getElementById(`${containerId}-title`).value;
+    const content = document.getElementById(`${containerId}-content`).value;
+    saveSectionNote(storageKey, title, content);
+    document.getElementById(`${containerId}-titledisplay`).textContent = title || '제목 없음';
+    flashSaved(`${containerId}-savestatus`);
+  });
+}
+function initAllSectionNotes(){
+  initSectionNote('sectionNoteMonthlyTrend', 'ggumbi_note_monthlyTrend');
+  initSectionNote('sectionNoteCoupangTrend', 'ggumbi_note_coupangTrend');
+  initSectionNote('sectionNoteItemGroupTrend', 'ggumbi_note_itemGroupTrend');
 }
 let pendingImages = {}; // slot -> base64 (저장 전 미리보기용, 현재 보이는 주차 기준)
 
@@ -1612,6 +1755,7 @@ function renderAll(){
     document.getElementById('mainContent').style.display='block';
     renderMonthChart();
     renderAll();
+    initAllSectionNotes();
     document.getElementById('footerNote').textContent = '데이터 출처: 각 월 거래명세서(매출)·정리(원가, 월별 블록 W열)·판매목표 ERP(목표) (GGUMBI F&B 원가관리 통합 데이터 시트), 26년 쿠팡 채널VS쿠팡 외 (F&B 마누스 로우데이터 시트) — 모두 구글시트에서 실시간 fetch';
   }catch(e){
     document.getElementById('loadingMsg').textContent = '데이터를 불러오지 못했습니다: ' + e.message + ' (구글시트가 "링크가 있는 모든 사용자" 공개 상태인지 확인해주세요)';
