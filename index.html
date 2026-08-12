@@ -229,10 +229,6 @@
     </div>
   </div>
 
-  <div class="section-title"><h2>월별 매출 추이</h2><span>1월~12월 (8월까지 진행중, 9월 이후는 예정)</span></div>
-  <div class="card"><div class="chart-box" style="height:260px;"><canvas id="monthChart"></canvas></div></div>
-  <div id="sectionNoteMonthlyTrend"></div>
-
   <div id="julySection" style="display:none;">
     <div class="week-tabs" id="periodToggleTop"></div>
 
@@ -1112,30 +1108,12 @@ document.getElementById('saveBtnF').addEventListener('click', ()=>{
 });
 
 
-let monthChart;
 let coupangTrendChart, itemGroupSalesChart, itemGroupShareChart;
 const DETAIL_MONTH_ORDER = ['2026-01','2026-02','2026-03','2026-04','2026-05','2026-06','2026-07','2026-08'];
 function detailMonthsUpTo(monthKey){
   const idx = DETAIL_MONTH_ORDER.indexOf(monthKey);
   return idx>=0 ? DETAIL_MONTH_ORDER.slice(0, idx+1) : DETAIL_MONTH_ORDER;
 }
-function renderMonthChart(){
-  const FULL_YEAR_MONTHS = ['2026-01','2026-02','2026-03','2026-04','2026-05','2026-06','2026-07','2026-08','2026-09','2026-10','2026-11','2026-12'];
-  const byMonth = {};
-  monthly.forEach(m=>{ byMonth[m.month] = m; });
-  const labels = FULL_YEAR_MONTHS;
-  const salesArr = FULL_YEAR_MONTHS.map(mo => byMonth[mo] ? byMonth[mo].sales/1_000_000 : null);
-  const colors = FULL_YEAR_MONTHS.map(mo => {
-    const m = byMonth[mo];
-    if(!m) return '#F0E9DB'; // 아직 데이터가 없는 미래 달 - 아주 옅은 색으로 자리만 표시
-    return m.is_actual ? '#3D9A9A' : '#A3D3D2';
-  });
-  const ctx = document.getElementById('monthChart');
-  if(monthChart) monthChart.destroy();
-  monthChart = new Chart(ctx, { type:'bar', data:{labels, datasets:[{label:'매출(백만원)', data:salesArr, backgroundColor:colors, borderRadius:5, maxBarThickness:44}]},
-    options:{maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:{grid:{color:'#F0E9DB'}}, x:{grid:{display:false}}}} });
-}
-
 function renderCoupangTrendChart(){
   const months = detailMonthsUpTo(selectedMonth);
   const labels = months.map(m=>MONTH_CONFIGS[m].label);
@@ -1163,7 +1141,8 @@ const ITEM_GROUPS = [
   {label:'3in1', names:['[G7] G7 3in1 100개입','[G7] G7 3in1 100개입 / 베트남PKG','[G7] G7 3in1 50개입','[G7] G7 3in1 50개입 / 베트남PKG']},
   {label:'3in1 Mild', names:['[G7] G7 3in1 Mild 120개입','[G7] G7 3in1 Mild 80개입','[G7] G7 3in1 Mild 20개입','[G7] G7 3in1 Mild 45개입']},
 ];
-const ITEM_GROUP_COLORS = ['#2A7D7B','#D97706','#3D5A99','#B85450','#8B6914','#A3D3D2'];
+const ITEM_GROUP_COLORS = ['#2A7D7B','#D97706','#FF1F8F','#B85450','#8B6914','#A3D3D2'];
+const ITEM_GROUP_HIGHLIGHT_INDEX = 2; // 퓨어블랙 라이트 — 다른 선보다 두드러지게 강조
 function computeItemGroupsForMonth(monthKey){
   const rows = monthCache[monthKey] ? monthCache[monthKey].txRows : [];
   const sums = ITEM_GROUPS.map(()=>0);
@@ -1194,7 +1173,10 @@ function renderItemGroupCharts(){
   function buildDatasets(dataArr){
     return groupLabels.map((label,i)=>{
       const color = ITEM_GROUP_COLORS[i%ITEM_GROUP_COLORS.length];
-      return {label, data:dataArr[i], borderColor:color, backgroundColor:color, tension:0.3, pointRadius:3.5, pointHoverRadius:5.5, borderWidth:2.2, fill:false};
+      const isHighlight = i===ITEM_GROUP_HIGHLIGHT_INDEX;
+      return {label, data:dataArr[i], borderColor:color, backgroundColor:color, tension:0.3,
+        pointRadius: isHighlight?5.5:3.5, pointHoverRadius: isHighlight?7.5:5.5,
+        borderWidth: isHighlight?4:2.2, order: isHighlight?0:1, fill:false};
     });
   }
   const salesCtx = document.getElementById('itemGroupSalesChart');
@@ -1570,7 +1552,7 @@ function saveNote(week, slot, title, content, image){
   remoteSet(key, shared);
 }
 
-// ---- 차트 섹션 메모 (월별 매출 추이 / 쿠팡 vs 쿠팡 외 / 주요 품목군 추이) — 월과 무관하게 하나씩만 있는 메모, 다른 PC와 공유됩니다 ----
+// ---- 차트 섹션 메모 (쿠팡 vs 쿠팡 외 / 주요 품목군 추이) — 월과 무관하게 하나씩만 있는 메모, 다른 PC와 공유됩니다 ----
 function loadSectionNote(storageKey){
   let local = {title:'', content:''};
   try { const raw = localStorage.getItem(storageKey); if(raw) local = JSON.parse(raw); } catch(e){}
@@ -1629,7 +1611,6 @@ function initSectionNote(containerId, storageKey){
   });
 }
 function initAllSectionNotes(){
-  initSectionNote('sectionNoteMonthlyTrend', 'ggumbi_note_monthlyTrend');
   initSectionNote('sectionNoteCoupangTrend', 'ggumbi_note_coupangTrend');
   initSectionNote('sectionNoteItemGroupTrend', 'ggumbi_note_itemGroupTrend');
 }
@@ -1753,7 +1734,6 @@ function renderAll(){
     updateRangePickerBounds();
     document.getElementById('loadingMsg').style.display='none';
     document.getElementById('mainContent').style.display='block';
-    renderMonthChart();
     renderAll();
     initAllSectionNotes();
     document.getElementById('footerNote').textContent = '데이터 출처: 각 월 거래명세서(매출)·정리(원가, 월별 블록 W열)·판매목표 ERP(목표) (GGUMBI F&B 원가관리 통합 데이터 시트), 26년 쿠팡 채널VS쿠팡 외 (F&B 마누스 로우데이터 시트) — 모두 구글시트에서 실시간 fetch';
