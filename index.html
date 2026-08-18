@@ -71,6 +71,7 @@
   tbody td:first-child,tbody td:nth-child(2){text-align:left;font-family:-apple-system,'Apple SD Gothic Neo','Noto Sans KR',sans-serif;font-weight:600;}
   tbody td.rank{font-weight:400;color:var(--muted);width:28px;}
   tbody tr.total-row td{font-weight:700;background:#FBF6EC;}
+  tbody tr.highlight-row td{font-weight:700;background:#EDEBE6;}
   .neg{color:var(--rust);} .pos{color:var(--teal);}
   .table-scroll{max-height:460px;overflow-y:auto;}
   .table-scroll-x{overflow-x:auto;}
@@ -246,10 +247,6 @@
       <table><thead><tr id="customerTableHead"><th>#</th><th>거래처</th><th>수량</th><th>매출</th><th>매출비중</th><th>목표</th><th>진척율</th><th>전주대비</th><th>원가</th><th>매출이익</th><th>이익률</th></tr></thead><tbody id="customerBody"></tbody></table>
       </div>
     </div>
-
-    <div class="section-title"><h2>쿠팡 vs 쿠팡 외 매출 추이</h2><span id="coupangTrendNote"></span></div>
-    <div class="card"><div class="chart-box" style="height:280px;"><canvas id="coupangTrendChart"></canvas></div></div>
-    <div id="sectionNoteCoupangTrend"></div>
 
     <div class="section-title"><h2>품목별 수익성</h2><span id="itemPeriodLabel">7월 누계</span></div>
     <div class="card">
@@ -763,9 +760,9 @@ function renderTopKpiRow(){
   const curMaxDay = curDays.length ? Math.max(...curDays) : daysInSelectedMonth();
   const prevSamePeriod = prevKey ? sameDayRangeRow(prevKey, curMaxDay) : null;
 
+  const curMonthNum = selectedMonth.slice(5,7);
   const dataAsOfEl = document.getElementById('dataAsOfLabel');
   if(dataAsOfEl){
-    const curMonthNum = selectedMonth.slice(5,7);
     dataAsOfEl.textContent = `매출기준일 ${curMonthNum}월 ${String(curMaxDay).padStart(2,'0')}일`;
   }
 
@@ -796,9 +793,11 @@ function renderTopKpiRow(){
     return `<span class="tk-badge ${cls}">${fmtPct(rate)}</span>`;
   }
 
+  const dataAsOfText = `매출기준일 ${curMonthNum}월 ${String(curMaxDay).padStart(2,'0')}일`;
+
   const cards = [
     {
-      label: `${MONTH_CONFIGS[selectedMonth].label} 매출`, icon:'\u20a9', color:'#3D5A99',
+      label: `${MONTH_CONFIGS[selectedMonth].label} 매출`, dateBadge: dataAsOfText, icon:'\u20a9', color:'#3D5A99',
       value: sales, sub: `계획 ${fmtWon(plan)}`, badge: `진척율 ${fmtPct(achieveRate)}`, badgeCls: achieveRate>=1?'pos':'neg',
       trend: trendLine(sales, prevSales),
     },
@@ -823,6 +822,7 @@ function renderTopKpiRow(){
     <div class="top-kpi-card">
       <div class="tk-head">
         <div class="tk-label">${c.label}</div>
+        ${c.dateBadge ? `<span class="live-chip" style="font-size:10.5px;padding:3px 10px;white-space:nowrap;">${c.dateBadge}</span>` : ''}
         <div class="tk-icon" style="background:${c.color}">${c.icon}</div>
       </div>
       <div class="tk-value">${c.value!=null ? fmtM(c.value)+'백만' : '입력 필요'}</div>
@@ -1121,30 +1121,11 @@ document.getElementById('saveBtnF').addEventListener('click', ()=>{
 });
 
 
-let coupangTrendChart, itemGroupSalesChart, itemGroupShareChart;
+let itemGroupSalesChart, itemGroupShareChart;
 const DETAIL_MONTH_ORDER = ['2026-01','2026-02','2026-03','2026-04','2026-05','2026-06','2026-07','2026-08'];
 function detailMonthsUpTo(monthKey){
   const idx = DETAIL_MONTH_ORDER.indexOf(monthKey);
   return idx>=0 ? DETAIL_MONTH_ORDER.slice(0, idx+1) : DETAIL_MONTH_ORDER;
-}
-function renderCoupangTrendChart(){
-  const months = detailMonthsUpTo(selectedMonth);
-  const labels = months.map(m=>MONTH_CONFIGS[m].label);
-  const coupangArr = [], restArr = [];
-  months.forEach(m=>{
-    const rows = monthCache[m] ? monthCache[m].txRows : [];
-    let coupang=0, total=0;
-    rows.forEach(r=>{ total+=r.sales; if(r.customer==='쿠팡 주식회사') coupang+=r.sales; });
-    coupangArr.push(Math.round(coupang/1e6*10)/10);
-    restArr.push(Math.round((total-coupang)/1e6*10)/10);
-  });
-  document.getElementById('coupangTrendNote').textContent = '1월부터 해당 월까지 표시됩니다';
-  const ctx = document.getElementById('coupangTrendChart');
-  if(coupangTrendChart) coupangTrendChart.destroy();
-  coupangTrendChart = new Chart(ctx, {type:'line', data:{labels, datasets:[
-    {label:'쿠팡(백만원)', data:coupangArr, borderColor:'#D97706', backgroundColor:'#D97706', tension:0.3, pointRadius:4, pointHoverRadius:6, borderWidth:2.5},
-    {label:'쿠팡 외(백만원)', data:restArr, borderColor:'#3D9A9A', backgroundColor:'#3D9A9A', tension:0.3, pointRadius:4, pointHoverRadius:6, borderWidth:2.5},
-  ]}, options:{maintainAspectRatio:false, plugins:{legend:{position:'bottom'}}, scales:{x:{grid:{display:false}}, y:{grid:{color:'#F0E9DB'}}}}});
 }
 
 const ITEM_GROUPS = [
@@ -1417,15 +1398,44 @@ function renderCustomers(){
     ? '<th>#</th><th>거래처</th><th>수량</th><th>매출</th><th>매출비중</th><th>전월매출</th><th>증감율</th><th>목표</th><th>진척율</th><th>원가</th><th>매출이익</th><th>이익률</th>'
     : '<th>#</th><th>거래처</th><th>수량</th><th>매출</th><th>매출비중</th><th>목표</th><th>진척율</th><th>전주대비</th><th>전월(동일주차)대비</th><th>원가</th><th>매출이익</th><th>이익률</th>';
 
-  function rowHtml(r, rankLabel, shareText){
+  function rowHtml(r, rankLabel, shareText, extraClass){
+    const cls = extraClass ? ` class="${extraClass}"` : '';
     const common = `<td>${fmtNum(r.qty)}</td><td>${fmtWon(r.sales)}</td><td>${shareText}</td>`;
-    if(isAll){
-      return `<td class="rank">${rankLabel}</td><td>${r.c}</td>${common}<td class="wk-plan">${prevSalesCell(r)}</td>${wowCell(r)}<td class="wk-plan">${planCell(r)}</td>${progressCell(r)}<td>${fmtWon(r.cost)}</td><td>${fmtWon(r.margin)}</td><td class="${r.rate<0.2?'neg':'pos'}">${fmtPct(r.rate)}</td>`;
-    }
-    return `<td class="rank">${rankLabel}</td><td>${r.c}</td>${common}<td class="wk-plan">${planCell(r)}</td>${progressCell(r)}${wowCell(r)}${momCell(r)}<td>${fmtWon(r.cost)}</td><td>${fmtWon(r.margin)}</td><td class="${r.rate<0.2?'neg':'pos'}">${fmtPct(r.rate)}</td>`;
+    const inner = isAll
+      ? `<td class="rank">${rankLabel}</td><td>${r.c}</td>${common}<td class="wk-plan">${prevSalesCell(r)}</td>${wowCell(r)}<td class="wk-plan">${planCell(r)}</td>${progressCell(r)}<td>${fmtWon(r.cost)}</td><td>${fmtWon(r.margin)}</td><td class="${r.rate<0.2?'neg':'pos'}">${fmtPct(r.rate)}</td>`
+      : `<td class="rank">${rankLabel}</td><td>${r.c}</td>${common}<td class="wk-plan">${planCell(r)}</td>${progressCell(r)}${wowCell(r)}${momCell(r)}<td>${fmtWon(r.cost)}</td><td>${fmtWon(r.margin)}</td><td class="${r.rate<0.2?'neg':'pos'}">${fmtPct(r.rate)}</td>`;
+    return `<tr${cls}>${inner}</tr>`;
   }
 
-  body.innerHTML = rows.map((r,i)=>`<tr>${rowHtml(r, i+1, fmtPct(totS? r.sales/totS : 0))}</tr>`).join('');
+  // 쿠팡 주식회사를 맨 위에, 그 아래 "쿠팡 외"(쿠팡을 제외한 나머지 전체 합계)를 강조 표시하고,
+  // 그 아래부터는 개별 거래처들을 다시 1번부터 순위 매김
+  const coupangRow = rows.find(r=>r.c==='쿠팡 주식회사');
+  const otherRows = rows.filter(r=>r.c!=='쿠팡 주식회사');
+  let bodyHtml = '';
+  if(coupangRow){
+    bodyHtml += rowHtml(coupangRow, 1, fmtPct(totS? coupangRow.sales/totS : 0), 'highlight-row');
+
+    const otherQty = otherRows.reduce((a,r)=>a+r.qty,0);
+    const otherSales = otherRows.reduce((a,r)=>a+r.sales,0);
+    const otherCost = otherRows.reduce((a,r)=>a+r.cost,0);
+    const otherMargin = otherSales - otherCost;
+    const otherRate = otherSales ? otherMargin/otherSales : 0;
+    const otherPlanRows = otherRows.filter(r=>r.plan!=null);
+    const otherPlan = otherPlanRows.length ? otherPlanRows.reduce((a,r)=>a+r.plan,0) : null;
+    const otherProgress = (otherPlan!=null && otherPlan>0) ? otherSales/otherPlan : null;
+    const otherPrevPeriod = (coupangRow.prevPeriodSales!=null) ? otherRows.reduce((a,r)=>a+(r.prevPeriodSales||0),0) : null;
+    const otherWow = (otherPrevPeriod!=null && otherPrevPeriod>0) ? (otherSales-otherPrevPeriod)/otherPrevPeriod : null;
+    let otherPrevMonthWeekTotal = 0, anyMomData = false;
+    otherRows.forEach(r=>{ if(r.mom!=null && r.sales){ otherPrevMonthWeekTotal += r.sales/(1+r.mom); anyMomData = true; } });
+    const otherMom = (anyMomData && otherPrevMonthWeekTotal>0) ? (otherSales-otherPrevMonthWeekTotal)/otherPrevMonthWeekTotal : null;
+
+    const otherRowObj = {c:'쿠팡 외', qty:otherQty, sales:otherSales, cost:otherCost, margin:otherMargin, rate:otherRate, plan:otherPlan, progress:otherProgress, wow:otherWow, mom:otherMom, prevPeriodSales:otherPrevPeriod};
+    bodyHtml += rowHtml(otherRowObj, '', fmtPct(totS? otherSales/totS : 0), 'highlight-row');
+    bodyHtml += otherRows.map((r,i)=>rowHtml(r, i+1, fmtPct(totS? r.sales/totS : 0))).join('');
+  } else {
+    bodyHtml = rows.map((r,i)=>rowHtml(r, i+1, fmtPct(totS? r.sales/totS : 0))).join('');
+  }
+  body.innerHTML = bodyHtml;
 
   // 합계 행: 목표는 시트의 공식 TTL(온라인 전체) 행을 그대로 사용 (개별 매칭 누락으로 인한 과소집계 방지)
   const ttl = customerTargets['Online TTL'];
@@ -1565,11 +1575,10 @@ function saveNote(week, slot, title, content, image){
   remoteSet(key, shared);
 }
 
-// ---- 차트/섹션 메모 (쿠팡 vs 쿠팡 외 / 주요 품목군 추이 / 예상마감 / 상단요약) — 월별로 따로 저장되고, 다른 PC와도 공유됩니다 ----
+// ---- 차트/섹션 메모 (주요 품목군 추이 / 예상마감 / 상단요약) — 월별로 따로 저장되고, 다른 PC와도 공유됩니다 ----
 const SECTION_NOTE_LIST = [
   {containerId:'sectionNoteTopSummary', baseKey:'ggumbi_note_topSummary'},
   {containerId:'sectionNoteForecast', baseKey:'ggumbi_note_forecast'},
-  {containerId:'sectionNoteCoupangTrend', baseKey:'ggumbi_note_coupangTrend'},
   {containerId:'sectionNoteItemGroupTrend', baseKey:'ggumbi_note_itemGroupTrend'},
 ];
 function sectionNoteKey(baseKey){ return `${baseKey}_${selectedMonth}`; }
@@ -1744,7 +1753,6 @@ function renderAll(){
     renderWeekTabs();
     renderDaily();
     renderCustomers();
-    renderCoupangTrendChart();
     renderItems();
     renderItemGroupCharts();
     renderWeekNoteList();
