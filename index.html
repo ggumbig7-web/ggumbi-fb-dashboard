@@ -163,6 +163,7 @@
         <h1>통합 매출·원가·손익 대시보드</h1>
       </div>
     </div>
+    <span id="dataAsOfLabel" class="live-chip" style="margin-right:8px;"></span>
     <div class="live-chip"><span class="dot"></span>구글시트 실시간 연동</div>
   </header>
 
@@ -759,6 +760,12 @@ function renderTopKpiRow(){
   const curDays = txRows.length ? txRows.map(r=>Number(String(r.date).slice(8,10))) : [];
   const curMaxDay = curDays.length ? Math.max(...curDays) : daysInSelectedMonth();
   const prevSamePeriod = prevKey ? sameDayRangeRow(prevKey, curMaxDay) : null;
+
+  const dataAsOfEl = document.getElementById('dataAsOfLabel');
+  if(dataAsOfEl){
+    const curMonthNum = selectedMonth.slice(5,7);
+    dataAsOfEl.textContent = `매출기준일 ${curMonthNum}월 ${String(curMaxDay).padStart(2,'0')}일`;
+  }
 
   let prevSales=null, prevGross=null, prevGrossRate=null, prevCm=null, prevCmRate=null, prevOp=null, prevOpRate=null;
   if(prevSamePeriod){
