@@ -265,6 +265,10 @@
       </div>
     </div>
 
+    <div class="section-title"><h2>쿠팡 vs 쿠팡 외 매출 추이</h2><span id="coupangTrendNote"></span></div>
+    <div class="card"><div class="chart-box" style="height:280px;"><canvas id="coupangTrendChart"></canvas></div></div>
+    <div id="sectionNoteCoupangTrend"></div>
+
     <div class="section-title"><h2>주요 품목군 매출 추이</h2><span id="itemGroupTrendNote"></span></div>
     <div class="grid-2">
       <div class="card"><h3 style="margin:0 0 10px;font-size:13px;">매출 (백만원)</h3><div class="chart-box" style="height:280px;"><canvas id="itemGroupSalesChart"></canvas></div></div>
@@ -1123,11 +1127,30 @@ document.getElementById('saveBtnF').addEventListener('click', ()=>{
 });
 
 
-let itemGroupSalesChart, itemGroupShareChart;
+let coupangTrendChart, itemGroupSalesChart, itemGroupShareChart;
 const DETAIL_MONTH_ORDER = ['2026-01','2026-02','2026-03','2026-04','2026-05','2026-06','2026-07','2026-08'];
 function detailMonthsUpTo(monthKey){
   const idx = DETAIL_MONTH_ORDER.indexOf(monthKey);
   return idx>=0 ? DETAIL_MONTH_ORDER.slice(0, idx+1) : DETAIL_MONTH_ORDER;
+}
+function renderCoupangTrendChart(){
+  const months = detailMonthsUpTo(selectedMonth);
+  const labels = months.map(m=>MONTH_CONFIGS[m].label);
+  const coupangArr = [], restArr = [];
+  months.forEach(m=>{
+    const rows = monthCache[m] ? monthCache[m].txRows : [];
+    let coupang=0, total=0;
+    rows.forEach(r=>{ total+=r.sales; if(r.customer==='쿠팡 주식회사') coupang+=r.sales; });
+    coupangArr.push(Math.round(coupang/1e6*10)/10);
+    restArr.push(Math.round((total-coupang)/1e6*10)/10);
+  });
+  document.getElementById('coupangTrendNote').textContent = '1월부터 해당 월까지 표시됩니다';
+  const ctx = document.getElementById('coupangTrendChart');
+  if(coupangTrendChart) coupangTrendChart.destroy();
+  coupangTrendChart = new Chart(ctx, {type:'line', data:{labels, datasets:[
+    {label:'쿠팡(백만원)', data:coupangArr, borderColor:'#D97706', backgroundColor:'#D97706', tension:0.3, pointRadius:4, pointHoverRadius:6, borderWidth:2.5},
+    {label:'쿠팡 외(백만원)', data:restArr, borderColor:'#3D9A9A', backgroundColor:'#3D9A9A', tension:0.3, pointRadius:4, pointHoverRadius:6, borderWidth:2.5},
+  ]}, options:{maintainAspectRatio:false, plugins:{legend:{position:'bottom'}}, scales:{x:{grid:{display:false}}, y:{grid:{color:'#F0E9DB'}}}}});
 }
 
 const ITEM_GROUPS = [
@@ -1592,6 +1615,7 @@ function saveNote(week, slot, title, content, image){
 const SECTION_NOTE_LIST = [
   {containerId:'sectionNoteTopSummary', baseKey:'ggumbi_note_topSummary'},
   {containerId:'sectionNoteForecast', baseKey:'ggumbi_note_forecast'},
+  {containerId:'sectionNoteCoupangTrend', baseKey:'ggumbi_note_coupangTrend'},
   {containerId:'sectionNoteItemGroupTrend', baseKey:'ggumbi_note_itemGroupTrend'},
 ];
 function sectionNoteKey(baseKey){ return `${baseKey}_${selectedMonth}_${selectedWeekTarget}`; }
@@ -1767,6 +1791,7 @@ function renderAll(){
     renderDaily();
     renderCustomers();
     renderItems();
+    renderCoupangTrendChart();
     renderItemGroupCharts();
     renderWeekNoteList();
   }
