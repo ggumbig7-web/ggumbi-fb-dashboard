@@ -179,6 +179,7 @@
     <div class="chan-toggle" id="topMonthToggle"></div>
     <span class="month-toggle-note" id="topMonthNote"></span>
     <div class="chan-toggle" id="weekTargetToggle" style="margin-left:auto;"></div>
+    <span class="month-toggle-note" id="weekTargetRangeLabel"></span>
   </div>
 
   <div class="target-grid-2col">
@@ -239,6 +240,7 @@
 
   <div id="julySection" style="display:none;">
     <div class="week-tabs" id="periodToggleTop"></div>
+    <span class="month-toggle-note" id="periodToggleTopRangeLabel"></span>
 
     <div class="section-title"><h2>거래처별 매출·매출이익</h2><span id="customerPeriodLabel"></span></div>
     <div class="card">
@@ -1209,12 +1211,20 @@ function renderWeekTargetToggle(){
   wrap.innerHTML = weeks.map(w=>
     `<button data-wk="${w.week}" class="${w.week===selectedWeekTarget?'active':''}">${w.week}</button>`
   ).join('');
+  const rangeEl = document.getElementById('weekTargetRangeLabel');
+  if(rangeEl){
+    const wdef0 = weeks.find(w=>w.week===selectedWeekTarget);
+    rangeEl.textContent = wdef0 ? `${wdef0.start}~${wdef0.end}` : '';
+  }
   wrap.querySelectorAll('button').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       wrap.querySelectorAll('button').forEach(b=>b.classList.remove('active'));
       btn.classList.add('active');
       selectedWeekTarget = btn.dataset.wk;
+      const wdef = weeks.find(w=>w.week===selectedWeekTarget);
+      if(rangeEl) rangeEl.textContent = wdef ? `${wdef.start}~${wdef.end}` : '';
       renderWeekTargetBox();
+      refreshAllSectionNotes();
     });
   });
 }
@@ -1250,7 +1260,10 @@ function renderWeekTabs(){
   buildPeriodButtons('periodToggleTop');
   buildPeriodButtons('weekTabs');
   const fullRange = weeks.length ? `${weeks[0].start}~${weeks[weeks.length-1].end}` : '';
-  document.getElementById('weekRangeLabel').textContent = selectedWeek ? (weeks.find(w=>w.week===selectedWeek).start+'~'+weeks.find(w=>w.week===selectedWeek).end) : fullRange;
+  const curRangeText = selectedWeek ? (weeks.find(w=>w.week===selectedWeek).start+'~'+weeks.find(w=>w.week===selectedWeek).end) : fullRange;
+  document.getElementById('weekRangeLabel').textContent = curRangeText;
+  const topLabel = document.getElementById('periodToggleTopRangeLabel');
+  if(topLabel) topLabel.textContent = curRangeText;
 }
 
 let dailyChart;
@@ -1581,7 +1594,7 @@ const SECTION_NOTE_LIST = [
   {containerId:'sectionNoteForecast', baseKey:'ggumbi_note_forecast'},
   {containerId:'sectionNoteItemGroupTrend', baseKey:'ggumbi_note_itemGroupTrend'},
 ];
-function sectionNoteKey(baseKey){ return `${baseKey}_${selectedMonth}`; }
+function sectionNoteKey(baseKey){ return `${baseKey}_${selectedMonth}_${selectedWeekTarget}`; }
 function loadSectionNote(storageKey){
   let local = {title:'', content:''};
   try { const raw = localStorage.getItem(storageKey); if(raw) local = JSON.parse(raw); } catch(e){}
