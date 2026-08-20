@@ -514,13 +514,38 @@ async function fetchCSV(sheetId, gid, retries=2){
 
 const monthCache = {}; // monthKey -> {unitCost, txRows, targets, gRowsGlobal}
 
+// 정리(원가) 시트는 모든 월이 한 시트에 들어있어 월마다 다시 받을 필요가 없다.
+// in-flight promise 자체를 캐싱해 동시에 여러 달이 요청해도 fetch가 1번만 나가게 한다.
+let costRowsPromise = null;
+function getCostRows(){
+  if(!costRowsPromise) costRowsPromise = fetchCSV(MAIN_SHEET, GID_JEONGLI);
+  return costRowsPromise;
+}
+
 async function loadMonthData(monthKey){
   if(monthCache[monthKey]) return monthCache[monthKey];
   const cfg = MONTH_CONFIGS[monthKey];
 
+  // 서로 의존하지 않는 시트 4종을 동시에 요청 (기존엔 하나씩 순차 대기했음)
+  const [costRows, tRows, ctRows, gRows] = await Promise.all([
+    getCostRows(),
+    fetchCSV(MAIN_SHEET, cfg.txGid),
+    cfg.customerTargetGid
+      ? fetchCSV(MAIN_SHEET, cfg.customerTargetGid).catch(e=>{
+          console.warn(`[${monthKey}] 거래처별 목표 시트(customerTargetGid=${cfg.customerTargetGid})를 불러오지 못했어요.`, e);
+          return [];
+        })
+      : Promise.resolve([]),
+    cfg.targetGid
+      ? fetchCSV(MAIN_SHEET, cfg.targetGid).catch(e=>{
+          console.warn(`[${monthKey}] 목표 시트(targetGid=${cfg.targetGid})를 불러오지 못했어요.`, e);
+          return [];
+        })
+      : Promise.resolve([]),
+  ]);
+
   // 1) cost lookup: 정리 시트에서 해당 월 블록의 W열(원가단가, 당월)
   const localUnitCost = {};
-  const costRows = await fetchCSV(MAIN_SHEET, GID_JEONGLI);
   for(let r=1;r<costRows.length;r++){
     const row = costRows[r];
     if(!row || row[4] !== cfg.jeongliMonth) continue; // E열 = 월
@@ -531,7 +556,6 @@ async function loadMonthData(monthKey){
 
   // 2) transactions from 해당 월 거래명세서 원본
   const localTxRows = [];
-  const tRows = await fetchCSV(MAIN_SHEET, cfg.txGid);
   const tm = cfg.txMap;
   const minCols = Math.max(tm.date, tm.customer, tm.code, tm.name, tm.qty, tm.sales) + 1;
   for(let r=cfg.txStartRow;r<tRows.length;r++){
@@ -551,30 +575,17 @@ async function loadMonthData(monthKey){
   // 3) 거래처별 주차 목표 (지금은 8월만 "8월 목표"류 시트가 있음) - 아래 큰 목표 시트가 없을 때 대체용으로도 씀
   const localCustomerTargets = {}; // label(거래처/채널명) -> {weekPlans:[...], monthlyPlan}
   if(cfg.customerTargetGid){
-    try {
-      const ctRows = await fetchCSV(MAIN_SHEET, cfg.customerTargetGid);
-      for(let r=0;r<ctRows.length;r++){
-        const row = ctRows[r];
-        const label = row && row[1] ? row[1].trim() : '';
-        if(!label || label==='Channel') continue;
-        const weekPlans = cfg.customerTargetWeekCols.map(ci=>numVal(row[ci]));
-        const monthlyPlan = numVal(row[cfg.customerTargetMonthlyCol]);
-        localCustomerTargets[label] = {weekPlans, monthlyPlan};
-      }
-    } catch(e) {
-      console.warn(`[${monthKey}] 거래처별 목표 시트(customerTargetGid=${cfg.customerTargetGid})를 불러오지 못했어요.`, e);
+    for(let r=0;r<ctRows.length;r++){
+      const row = ctRows[r];
+      const label = row && row[1] ? row[1].trim() : '';
+      if(!label || label==='Channel') continue;
+      const weekPlans = cfg.customerTargetWeekCols.map(ci=>numVal(row[ci]));
+      const monthlyPlan = numVal(row[cfg.customerTargetMonthlyCol]);
+      localCustomerTargets[label] = {weekPlans, monthlyPlan};
     }
   }
 
   // 4) targets from 해당 월 판매목표 ERP (시트가 삭제/누락됐어도 전체가 멈추지 않도록 방어)
-  let gRows = [];
-  if(cfg.targetGid){
-    try {
-      gRows = await fetchCSV(MAIN_SHEET, cfg.targetGid);
-    } catch(e) {
-      console.warn(`[${monthKey}] 목표 시트(targetGid=${cfg.targetGid})를 불러오지 못했어요.`, e);
-    }
-  }
   function cell(r, colLetters){ const row = gRows[r-1]; return row ? numVal(row[colIdx(colLetters)]) : 0; }
   let localTargets;
 
@@ -669,9 +680,13 @@ function applyMonthLabels(){
 
 async function loadAll(){
   // 이제 1~8월 전부 각 월 거래명세서+정리 원가 기준으로 정확히 집계합니다.
+  // 8개월을 전부 동시에 쏘면 구글시트가 순간적으로 막을 수 있어, 3개씩 묶어서 병렬 처리한다.
+  const MONTH_BATCH_SIZE = 3;
+  for(let i=0;i<DETAIL_MONTH_ORDER.length;i+=MONTH_BATCH_SIZE){
+    const batch = DETAIL_MONTH_ORDER.slice(i, i+MONTH_BATCH_SIZE);
+    await Promise.all(batch.map(key=>loadMonthData(key)));
+  }
   for(const key of DETAIL_MONTH_ORDER){
-    await loadMonthData(key);
-    await new Promise(r=>setTimeout(r, 150)); // 구글시트 요청 과다로 인한 순간 차단 방지
     const rows = monthCache[key].txRows;
     const sales = rows.reduce((a,r)=>a+r.sales,0);
     const cost = rows.reduce((a,r)=>a+r.cost,0);
