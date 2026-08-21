@@ -784,7 +784,7 @@ function renderTopKpiRow(){
   const curMonthNum = selectedMonth.slice(5,7);
   const dataAsOfEl = document.getElementById('dataAsOfLabel');
   if(dataAsOfEl){
-    dataAsOfEl.textContent = `매출기준일 ${curMonthNum}월 ${String(curMaxDay).padStart(2,'0')}일`;
+    dataAsOfEl.textContent = `매출기준일 ${Number(curMonthNum)}/1~${Number(curMonthNum)}/${curMaxDay}`;
   }
 
   let prevSales=null, prevGross=null, prevGrossRate=null, prevCm=null, prevCmRate=null, prevOp=null, prevOpRate=null;
@@ -814,7 +814,7 @@ function renderTopKpiRow(){
     return `<span class="tk-badge ${cls}">${fmtPct(rate)}</span>`;
   }
 
-  const dataAsOfText = `매출기준일 ${curMonthNum}월 ${String(curMaxDay).padStart(2,'0')}일`;
+  const dataAsOfText = `매출기준일 ${Number(curMonthNum)}/1~${Number(curMonthNum)}/${curMaxDay}`;
 
   const cards = [
     {
