@@ -348,8 +348,8 @@ function fmtPct(n){ return isFinite(n) ? (n*100).toFixed(1)+'%' : '-'; }
 const MONTH_CONFIGS = {
   '2026-01': {
     label:'1월', jeongliMonth:'1월', daysInMonth:31,
-    targetGid:null, txGid:'1537850249', txStartRow:3,
-    txMap:{date:4, customer:8, code:12, name:11, qty:16, sales:21},
+    targetGid:null, txGid:'1537850249', txStartRow:1,
+    txMap:{date:0, customer:1, name:2, code:3, qty:4, sales:5},
     weeks:[
       {week:'1주차', start:'2026-01-01', end:'2026-01-07', planCol:'AZ', actualCol:'BA'},
       {week:'2주차', start:'2026-01-08', end:'2026-01-14', planCol:'BD', actualCol:'BE'},
@@ -399,7 +399,7 @@ const MONTH_CONFIGS = {
   '2026-05': {
     label:'5월', jeongliMonth:'5월', daysInMonth:31,
     targetGid:'1107573904', txGid:'10662366', txStartRow:1,
-    txMap:{date:4, customer:10, code:21, name:20, qty:25, sales:30},
+    txMap:{date:0, customer:1, name:2, code:3, qty:4, sales:5},
     weeks:[
       {week:'1주차', start:'2026-05-01', end:'2026-05-10', planCol:'AX', actualCol:'AY'},
       {week:'2주차', start:'2026-05-11', end:'2026-05-17', planCol:'BB', actualCol:'BC'},
@@ -411,7 +411,7 @@ const MONTH_CONFIGS = {
   '2026-06': {
     label:'6월', jeongliMonth:'6월', daysInMonth:30,
     targetGid:'1233165628', txGid:'677281837', txStartRow:1,
-    txMap:{date:4, customer:10, code:21, name:20, qty:25, sales:30},
+    txMap:{date:0, customer:1, name:2, code:3, qty:4, sales:5},
     weeks:[
       {week:'1주차', start:'2026-06-01', end:'2026-06-07', planCol:'AY', actualCol:'AZ'},
       {week:'2주차', start:'2026-06-08', end:'2026-06-14', planCol:'BC', actualCol:'BD'},
@@ -422,8 +422,8 @@ const MONTH_CONFIGS = {
   },
   '2026-07': {
     label:'7월', jeongliMonth:'7월', daysInMonth:31,
-    targetGid:'69590838', txGid:'1096885211', txStartRow:3,
-    txMap:{date:4, customer:8, code:12, name:11, qty:16, sales:21},
+    targetGid:'69590838', txGid:'1096885211', txStartRow:1,
+    txMap:{date:0, customer:1, name:2, code:3, qty:4, sales:5},
     weeks:[
       {week:'1주차', start:'2026-07-01', end:'2026-07-05', planCol:'AZ', actualCol:'BA'},
       {week:'2주차', start:'2026-07-06', end:'2026-07-12', planCol:'BD', actualCol:'BE'},
@@ -436,7 +436,7 @@ const MONTH_CONFIGS = {
   '2026-08': {
     label:'8월', jeongliMonth:'8월', daysInMonth:31,
     targetGid:'28081971', txGid:'286418214', txStartRow:1,
-    txMap:{date:4, customer:8, code:12, name:11, qty:16, sales:21},
+    txMap:{date:0, customer:1, name:2, code:3, qty:4, sales:5},
     customerTargetGid:'1617501801', customerTargetWeekCols:[3,4,5,6], customerTargetMonthlyCol:7,
     weeks:[
       {week:'1주차', start:'2026-08-01', end:'2026-08-09', planCol:'BA', actualCol:'BB'},
